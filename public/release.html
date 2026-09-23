@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Release PR Summary</title>
+<style>
+  body { font-family: -apple-system, Arial, sans-serif; margin: 2rem; background: #f7f8fa; color: #1a1a1a; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  .back { display: inline-block; margin-bottom: 1.2rem; color: #33399b; text-decoration: none; font-size: 0.9rem; }
+  .back:hover { text-decoration: underline; }
+  #status { margin-bottom: 1rem; color: #555; font-size: 0.9rem; }
+  .err { color: #b00020; }
+  .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1rem 1.2rem; margin-bottom: 1rem; }
+  .card h2 { margin: 0 0 0.3rem; font-size: 1.05rem; }
+  .crf { color: #33399b; font-weight: 600; font-size: 0.85rem; }
+  .crf a { color: inherit; }
+  .pr-row { display: flex; align-items: baseline; gap: 0.6rem; padding: 0.3rem 0; border-top: 1px solid #f0f0f2; }
+  .pr-row:first-of-type { border-top: none; margin-top: 0.5rem; }
+  .pr-label { display: inline-block; min-width: 90px; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; padding: 0.1rem 0.5rem; border-radius: 4px; }
+  .pr-label.static { background: #e0e7ff; color: #33399b; }
+  .pr-label.canary { background: #fff3cd; color: #8a6100; }
+  .pr-label.non-canary { background: #e6f4ea; color: #1e6b3a; }
+  .pr-meta { color: #888; font-size: 0.8rem; }
+  .automated-flag { color: #b00020; font-size: 0.75rem; font-weight: 600; margin-left: 0.3rem; }
+  a.pr-link { color: #1a1a1a; text-decoration: none; }
+  a.pr-link:hover { text-decoration: underline; }
+  .copy-btn { border: 1px solid #ccc; background: white; border-radius: 4px; font-size: 0.75rem; padding: 0.1rem 0.5rem; cursor: pointer; color: #444; }
+  .copy-btn:hover { background: #f0f0f2; }
+  .copy-btn.copied { background: #e6f4ea; color: #1e6b3a; border-color: #1e6b3a; }
+  .copy-all-btn { border: 1px solid #33399b; background: white; color: #33399b; border-radius: 6px; font-size: 0.85rem; padding: 0.4rem 0.9rem; cursor: pointer; margin-bottom: 1rem; }
+  .copy-all-btn:hover { background: #eef; }
+  .copy-all-btn.copied { background: #e6f4ea; color: #1e6b3a; border-color: #1e6b3a; }
+</style>
+</head>
+<body>
+  <a class="back" href="index.html">&larr; Back to comparison</a>
+  <h1>Release PR Summary</h1>
+  <div id="status">Loading open PRs across dgp-deployment repos...</div>
+  <button id="copy-all" class="copy-all-btn" style="display:none">Copy formatted list</button>
+  <div id="cards"></div>
+
+<script>
+const statusEl = document.getElementById('status');
+const cards = document.getElementById('cards');
+const copyAllBtn = document.getElementById('copy-all');
+let formattedList = '';
+
+const LABEL_TEXT = { static: 'Static', canary: 'canary', 'non-canary': 'Non-canary' };
+const LABEL_ORDER = { static: 0, 'non-canary': 1, canary: 2 };
+
+function friendlyServiceName(service) {
+  return service.replace(/^gdn-/, '');
+}
+
+function buildFormattedList(results) {
+  return results
+    .map((r) => {
+      const prs = [...r.prs]
+        .filter((pr) => !pr.automated)
+        .sort((a, b) => (LABEL_ORDER[a.label] ?? 9) - (LABEL_ORDER[b.label] ?? 9));
+      if (prs.length === 0) return null;
+      const lines = prs.map((pr) => `${LABEL_TEXT[pr.label] || pr.label}: ${pr.url}`);
+      return `${friendlyServiceName(r.service)}:\n${lines.join('\n')}`;
+    })
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function fmtDate(iso) {
+  return new Date(iso).toLocaleString();
+}
+
+async function copyText(text, btn, revertLabel) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (err) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+  const original = btn.textContent;
+  btn.textContent = 'Copied!';
+  btn.classList.add('copied');
+  setTimeout(() => {
+    btn.textContent = revertLabel || original;
+    btn.classList.remove('copied');
+  }, 1500);
+}
+
+cards.addEventListener('click', (e) => {
+  const btn = e.target.closest('.copy-btn');
+  if (!btn) return;
+  copyText(btn.dataset.url, btn, 'Copy');
+});
+
+copyAllBtn.addEventListener('click', () => {
+  copyText(formattedList, copyAllBtn, 'Copy formatted list');
+});
+
+async function load() {
+  try {
+    const res = await fetch('/api/release-prs');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+
+    cards.innerHTML = '';
+    data.results.forEach((r) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      const crfHtml = r.crf
+        ? `<div class="crf"><a href="https://gdncomm.atlassian.net/browse/${r.crf}" target="_blank" rel="noopener">${r.crf}</a></div>`
+        : '';
+      const prsSorted = [...r.prs].sort((a, b) => (LABEL_ORDER[a.label] ?? 9) - (LABEL_ORDER[b.label] ?? 9));
+      const prRows = prsSorted
+        .map(
+          (pr) => `
+        <div class="pr-row">
+          <span class="pr-label ${pr.label}">${pr.label}</span>
+          <a class="pr-link" href="${pr.url}" target="_blank" rel="noopener">${pr.repo.replace('gdncomm/', '')}#${pr.number}</a>
+          <button class="copy-btn" data-url="${pr.url}">Copy</button>
+          <span class="pr-meta">${pr.title} &middot; ${pr.author} &middot; ${fmtDate(pr.createdAt)}</span>
+          ${pr.automated ? '<span class="automated-flag">AUTOMATED &mdash; not a release PR</span>' : ''}
+        </div>`
+        )
+        .join('');
+      card.innerHTML = `<h2>${r.service}</h2>${crfHtml}${prRows}`;
+      cards.appendChild(card);
+    });
+
+    formattedList = buildFormattedList(data.results);
+    copyAllBtn.style.display = formattedList ? '' : 'none';
+
+    statusEl.textContent = `${data.results.length} services with open release PRs.`;
+  } catch (err) {
+    statusEl.innerHTML = `<span class="err">Error: ${err.message}</span>`;
+  }
+}
+
+load();
+</script>
+</body>
+</html>

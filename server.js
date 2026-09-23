@@ -101,6 +101,27 @@ function serviceKey(repoName) {
   return repoName.replace(/^(nonprod|prod)-(deployment|infra)-/, '');
 }
 
+// Repos that belong to the same release train but aren't tagged into the
+// dgp-deployment team (missing squad/tribe custom property), so the Teams
+// API won't return them.
+const EXTRA_PROD_REPOS = ['gdncomm/prod-deployment-gdn-pyeongyang-ui'];
+
+const CRF_RE = /CRF-\d+/i;
+
+function labelPr(repoName, pr) {
+  if (pr.base.ref === 'canary-prod') return 'canary';
+  if (repoName.endsWith('-static')) return 'static';
+  return 'non-canary';
+}
+
+function isAutomatedAuthor(login) {
+  return login.includes('[bot]') || login.includes('automation');
+}
+
+async function fetchRecentPrs(repoFullName, count = 15) {
+  return ghGet(`${GH_API}/repos/${repoFullName}/pulls?state=all&sort=created&direction=desc&per_page=${count}`);
+}
+
 async function fetchEnvVersions(repoFullName, envs) {
   const out = {};
   await Promise.all(
@@ -249,6 +270,79 @@ app.get('/api/versions/compare', async (req, res) => {
     for (const env of NONPROD_ENVS) envConfig[env.label] = { side: 'nonprod', branch: env.branch, dir: env.dir };
     for (const env of PROD_ENVS) envConfig[env.label] = { side: 'prod', branch: env.branch, dir: env.dir };
     res.json({ envLabels: ALL_ENV_LABELS, envConfig, results });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/release-prs', async (req, res) => {
+  if (!TOKEN) {
+    return res.status(500).json({ error: 'GITHUB_TOKEN not set on server' });
+  }
+  try {
+    const teamRepos = await listTeamRepos(PROD_TEAM_SLUG);
+    const extraRepos = await Promise.all(
+      EXTRA_PROD_REPOS.map((full) => ghGet(`${GH_API}/repos/${full}`))
+    );
+    const repos = [...teamRepos, ...extraRepos];
+
+    const rows = new Map();
+    await Promise.all(
+      repos.map(async (repo) => {
+        let prs;
+        try {
+          prs = await fetchRecentPrs(repo.full_name);
+        } catch (err) {
+          prs = [];
+        }
+        if (prs.length === 0) return;
+
+        const key = serviceKey(repo.name);
+        if (!rows.has(key)) rows.set(key, { service: key, crf: null, prs: [] });
+        const row = rows.get(key);
+
+        // Keep only the most recent human-authored PR per label per repo —
+        // prefer a real release PR (even closed) over noisier bot/automation
+        // PRs (e.g. secret-rotation bumps) that happen to be more recent.
+        const latestByLabel = new Map();
+        for (const pr of prs) {
+          const label = labelPr(repo.name, pr);
+          const author = pr.user?.login || 'unknown';
+          const automated = isAutomatedAuthor(author);
+          const existingPr = latestByLabel.get(label);
+          if (!existingPr) {
+            latestByLabel.set(label, pr);
+            continue;
+          }
+          const existingAutomated = isAutomatedAuthor(existingPr.user?.login || 'unknown');
+          if (existingAutomated && !automated) {
+            latestByLabel.set(label, pr);
+          } else if (existingAutomated === automated && new Date(pr.created_at) > new Date(existingPr.created_at)) {
+            latestByLabel.set(label, pr);
+          }
+        }
+
+        for (const [label, pr] of latestByLabel) {
+          const crfMatch = pr.title.match(CRF_RE) || pr.head.ref.match(CRF_RE);
+          if (crfMatch && !row.crf) row.crf = crfMatch[0].toUpperCase();
+          const author = pr.user?.login || 'unknown';
+          row.prs.push({
+            label,
+            repo: repo.full_name,
+            number: pr.number,
+            title: pr.title,
+            url: pr.html_url,
+            author,
+            createdAt: pr.created_at,
+            baseRef: pr.base.ref,
+            automated: author.includes('[bot]') || author.includes('automation'),
+          });
+        }
+      })
+    );
+
+    const results = Array.from(rows.values()).sort((a, b) => a.service.localeCompare(b.service));
+    res.json({ results });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

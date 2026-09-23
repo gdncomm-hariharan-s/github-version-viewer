@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>GitHub Version Viewer</title>
+<style>
+  body { font-family: -apple-system, Arial, sans-serif; margin: 2rem; background: #f7f8fa; color: #1a1a1a; }
+  h1 { font-size: 1.4rem; }
+  .buttons { margin-bottom: 1.5rem; }
+  button { padding: 0.6rem 1.2rem; margin-right: 0.75rem; font-size: 0.95rem; cursor: pointer; border: 1px solid #ccc; border-radius: 6px; background: white; }
+  button:hover { background: #eef; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  table { border-collapse: collapse; width: 100%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.85rem; }
+  th, td { text-align: left; padding: 0.45rem 0.7rem; border-bottom: 1px solid #eee; white-space: nowrap; }
+  th { background: #f0f0f2; position: sticky; top: 0; }
+  .err { color: #b00020; }
+  .na { color: #aaa; }
+  .mismatch { background: #fff3cd; color: #8a6100; font-weight: 600; }
+  .fallback { background: #e0e7ff; color: #33399b; }
+  #status { margin-bottom: 1rem; color: #555; font-size: 0.9rem; }
+  .table-wrap { overflow-x: auto; }
+  .legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; font-size: 0.82rem; color: #444; }
+  .legend-item { display: flex; align-items: center; gap: 0.4rem; }
+  .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.15); }
+  .swatch.mismatch { background: #fff3cd; }
+  .swatch.fallback { background: #e0e7ff; }
+  .swatch.na { background: #f5f5f5; }
+  .swatch.ok { background: #ffffff; }
+</style>
+</head>
+<body>
+  <h1>Repo Version Comparison</h1>
+  <div class="buttons">
+    <button id="btn-compare">Compare Versions</button>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><span class="swatch ok"></span> Version read from deployment/&lt;env&gt;/values.yaml (image.tag)</div>
+    <div class="legend-item"><span class="swatch mismatch"></span> Mismatch: base env version differs from its canary counterpart</div>
+    <div class="legend-item"><span class="swatch fallback"></span> No values.yaml found &mdash; version read from Jenkinsfile instead</div>
+    <div class="legend-item"><span class="swatch na"></span> &ldquo;-&rdquo; = no version found in any source for that env</div>
+  </div>
+  <div id="status"></div>
+  <div class="table-wrap">
+    <table id="result-table" style="display:none">
+      <thead><tr id="header-row"></tr></thead>
+      <tbody id="result-body"></tbody>
+    </table>
+  </div>
+
+<script>
+const statusEl = document.getElementById('status');
+const table = document.getElementById('result-table');
+const headerRow = document.getElementById('header-row');
+const tbody = document.getElementById('result-body');
+const btn = document.getElementById('btn-compare');
+
+const PAIRS = [
+  ['qa2', 'canary-qa2'],
+  ['preprod', 'canary-preprod'],
+  ['prod', 'canary-prod'],
+];
+
+function cell(version) {
+  if (!version) return '<span class="na">-</span>';
+  return version;
+}
+
+async function load() {
+  btn.disabled = true;
+  statusEl.textContent = 'Fetching versions across all environments...';
+  table.style.display = 'none';
+  try {
+    const res = await fetch('/api/versions/compare');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+
+    headerRow.innerHTML =
+      '<th>Service</th>' + data.envLabels.map((l) => `<th>${l}</th>`).join('');
+
+    tbody.innerHTML = '';
+    data.results.forEach((r) => {
+      const tr = document.createElement('tr');
+      const cells = data.envLabels
+        .map((label) => {
+          const version = r.versions[label];
+          const pair = PAIRS.find((p) => p.includes(label));
+          let mismatch = false;
+          if (pair) {
+            const [a, b] = pair;
+            const va = r.versions[a];
+            const vb = r.versions[b];
+            mismatch = va && vb && va !== vb;
+          }
+          const isFallback = r.sources && r.sources[label] === 'jenkinsfile';
+          const cls = mismatch ? 'mismatch' : isFallback ? 'fallback' : '';
+          return `<td class="${cls}">${cell(version)}</td>`;
+        })
+        .join('');
+      tr.innerHTML = `<td>${r.service}</td>${cells}`;
+      tbody.appendChild(tr);
+    });
+    table.style.display = '';
+    statusEl.textContent = `${data.results.length} services compared. Highlighted cells = base vs canary version mismatch.`;
+  } catch (err) {
+    statusEl.innerHTML = `<span class="err">Error: ${err.message}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+btn.addEventListener('click', load);
+</script>
+</body>
+</html>

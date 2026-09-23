@@ -1,0 +1,29 @@
+server.js
+  82e436acf6a16461 104-124,278-350
+public/index.html
+  82e436acf6a16461 35
+public/release.html
+  82e436acf6a16461 1-147
+.gitignore
+  82e436acf6a16461 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.23",
+  "base_commit_sha": "81e87625b389846e9fe5ef1682e31f50f25905fd",
+  "prompts": {
+    "82e436acf6a16461": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9b999ace-fe3d-4ee4-a883-b9039864d7ed",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "hariharan s <hariharan.s@gdn-commerce.com>",
+      "messages": [],
+      "total_additions": 258,
+      "total_deletions": 15,
+      "accepted_lines": 243,
+      "overriden_lines": 0
+    }
+  }
+}

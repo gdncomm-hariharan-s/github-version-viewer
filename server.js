@@ -116,7 +116,60 @@ async function fetchEnvVersions(repoFullName, envs) {
   return out;
 }
 
+async function fetchFileHistory(repoFullName, branch, filePath, limit = 10) {
+  const url = `${GH_API}/repos/${repoFullName}/commits?path=${encodeURIComponent(
+    filePath
+  )}&sha=${encodeURIComponent(branch)}&per_page=${limit}`;
+  const commits = await ghGet(url);
+
+  const extractor = filePath.endsWith('Jenkinsfile') ? extractJenkinsfileVersion : extractImageTag;
+
+  return Promise.all(
+    commits.map(async (c) => {
+      let version = null;
+      try {
+        const contentUrl = `${GH_API}/repos/${repoFullName}/contents/${filePath}?ref=${c.sha}`;
+        const cRes = await fetch(contentUrl, { headers: ghHeaders() });
+        if (cRes.ok) {
+          const cData = await cRes.json();
+          if (cData.content) {
+            const text = Buffer.from(cData.content, 'base64').toString('utf8');
+            version = extractor(text);
+          }
+        }
+      } catch (err) {
+        version = null;
+      }
+      return {
+        sha: c.sha,
+        shortSha: c.sha.slice(0, 7),
+        author: c.commit.author?.name || c.author?.login || 'unknown',
+        date: c.commit.author?.date || null,
+        message: c.commit.message.split('\n')[0],
+        htmlUrl: c.html_url,
+        version,
+      };
+    })
+  );
+}
+
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/api/file-history', async (req, res) => {
+  if (!TOKEN) {
+    return res.status(500).json({ error: 'GITHUB_TOKEN not set on server' });
+  }
+  const { repo, branch, path: filePath } = req.query;
+  if (!repo || !branch || !filePath) {
+    return res.status(400).json({ error: 'repo, branch, and path query params are required' });
+  }
+  try {
+    const history = await fetchFileHistory(repo, branch, filePath);
+    res.json({ repo, branch, path: filePath, history });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.get('/api/versions/compare', async (req, res) => {
   if (!TOKEN) {
@@ -192,7 +245,10 @@ app.get('/api/versions/compare', async (req, res) => {
     );
 
     const results = Array.from(rows.values()).sort((a, b) => a.service.localeCompare(b.service));
-    res.json({ envLabels: ALL_ENV_LABELS, results });
+    const envConfig = {};
+    for (const env of NONPROD_ENVS) envConfig[env.label] = { side: 'nonprod', branch: env.branch, dir: env.dir };
+    for (const env of PROD_ENVS) envConfig[env.label] = { side: 'prod', branch: env.branch, dir: env.dir };
+    res.json({ envLabels: ALL_ENV_LABELS, envConfig, results });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

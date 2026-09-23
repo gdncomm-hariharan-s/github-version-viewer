@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Version History</title>
+<style>
+  body { font-family: -apple-system, Arial, sans-serif; margin: 2rem; background: #f7f8fa; color: #1a1a1a; }
+  h1 { font-size: 1.3rem; margin-bottom: 0.2rem; }
+  .subtitle { color: #555; font-size: 0.9rem; margin-bottom: 1.2rem; }
+  .back { display: inline-block; margin-bottom: 1.2rem; color: #33399b; text-decoration: none; font-size: 0.9rem; }
+  .back:hover { text-decoration: underline; }
+  table { border-collapse: collapse; width: 100%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.88rem; }
+  th, td { text-align: left; padding: 0.5rem 0.8rem; border-bottom: 1px solid #eee; }
+  th { background: #f0f0f2; }
+  tr.current { background: #eef8ee; }
+  .version { font-weight: 600; }
+  .meta { color: #888; font-size: 0.8rem; }
+  a.commit-link { color: #33399b; text-decoration: none; }
+  a.commit-link:hover { text-decoration: underline; }
+  #status { color: #555; font-size: 0.9rem; }
+  .err { color: #b00020; }
+</style>
+</head>
+<body>
+  <a class="back" href="index.html">&larr; Back to comparison</a>
+  <h1 id="title">Version history</h1>
+  <div class="subtitle" id="subtitle"></div>
+  <div id="status">Loading...</div>
+  <table id="result-table" style="display:none">
+    <thead>
+      <tr><th>Version</th><th>Changed</th><th>Author</th><th>Commit</th></tr>
+    </thead>
+    <tbody id="result-body"></tbody>
+  </table>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const repo = params.get('repo');
+const branch = params.get('branch');
+const path = params.get('path');
+const service = params.get('service');
+const label = params.get('label');
+const currentVersion = params.get('version');
+
+document.getElementById('title').textContent = `${service || repo} — ${label || ''}`;
+document.getElementById('subtitle').textContent = `${repo} @ ${branch} — ${path}`;
+
+const statusEl = document.getElementById('status');
+const table = document.getElementById('result-table');
+const tbody = document.getElementById('result-body');
+
+function fmtDate(iso) {
+  if (!iso) return '-';
+  return new Date(iso).toLocaleString();
+}
+
+async function load() {
+  if (!repo || !branch || !path) {
+    statusEl.innerHTML = '<span class="err">Missing repo/branch/path in URL.</span>';
+    return;
+  }
+  try {
+    const res = await fetch(
+      `/api/file-history?repo=${encodeURIComponent(repo)}&branch=${encodeURIComponent(
+        branch
+      )}&path=${encodeURIComponent(path)}`
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+
+    tbody.innerHTML = '';
+    data.history.forEach((h) => {
+      const tr = document.createElement('tr');
+      if (currentVersion && h.version === currentVersion) tr.classList.add('current');
+      tr.innerHTML = `
+        <td class="version">${h.version || '-'}</td>
+        <td>${fmtDate(h.date)}</td>
+        <td>${h.author}</td>
+        <td><a class="commit-link" href="${h.htmlUrl}" target="_blank" rel="noopener">${h.shortSha}</a> <span class="meta">${h.message}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+    table.style.display = '';
+    statusEl.textContent = data.history.length
+      ? `Showing last ${data.history.length} commits touching this file.`
+      : 'No commit history found for this file.';
+  } catch (err) {
+    statusEl.innerHTML = `<span class="err">Error: ${err.message}</span>`;
+  }
+}
+
+load();
+</script>
+</body>
+</html>

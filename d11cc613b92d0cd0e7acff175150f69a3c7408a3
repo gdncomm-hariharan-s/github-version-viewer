@@ -1,0 +1,31 @@
+public/release.html
+  82e436acf6a16461 5,7-20,23-35,83,86,109,111,117-122,126,131,135
+public/detail.html
+  82e436acf6a16461 5,7-16,19-45,70,85,88-91,95,100
+public/index.html
+  82e436acf6a16461 5,7-30,33-39,41-78,81-124,138-141,145-153,159-230,232-280,282-331,333-334,338-339,345-353,355,360-573
+server.js
+  82e436acf6a16461 73-81,83-90,119-120,122-126,144-152,159,174-176,207-299,301-371,394,397-398,400-401,444-452,457-465,470-472,488,502-512,551,558-560
+README.md
+  82e436acf6a16461 1-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.23",
+  "base_commit_sha": "d11cc613b92d0cd0e7acff175150f69a3c7408a3",
+  "prompts": {
+    "82e436acf6a16461": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9b999ace-fe3d-4ee4-a883-b9039864d7ed",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "hariharan s <hariharan.s@gdn-commerce.com>",
+      "messages": [],
+      "total_additions": 1696,
+      "total_deletions": 977,
+      "accepted_lines": 912,
+      "overriden_lines": 0
+    }
+  }
+}

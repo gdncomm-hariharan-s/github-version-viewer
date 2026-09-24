@@ -2,50 +2,125 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>GitHub Version Viewer</title>
-<style>
-  body { font-family: -apple-system, Arial, sans-serif; margin: 2rem; background: #f7f8fa; color: #1a1a1a; }
-  h1 { font-size: 1.4rem; }
-  .buttons { margin-bottom: 1.5rem; }
-  button { padding: 0.6rem 1.2rem; margin-right: 0.75rem; font-size: 0.95rem; cursor: pointer; border: 1px solid #ccc; border-radius: 6px; background: white; }
-  button:hover { background: #eef; }
-  button:disabled { opacity: 0.5; cursor: default; }
-  table { border-collapse: collapse; width: 100%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.85rem; }
-  th, td { text-align: left; padding: 0.45rem 0.7rem; border-bottom: 1px solid #eee; white-space: nowrap; }
-  th { background: #f0f0f2; position: sticky; top: 0; }
-  .err { color: #b00020; }
-  .na { color: #aaa; }
-  .mismatch { background: #fff3cd; color: #8a6100; font-weight: 600; }
-  .fallback { background: #e0e7ff; color: #33399b; }
-  td a.version-link { color: inherit; text-decoration: none; border-bottom: 1px dotted currentColor; cursor: pointer; }
-  td a.version-link:hover { border-bottom-style: solid; }
-  #status { margin-bottom: 1rem; color: #555; font-size: 0.9rem; }
-  .table-wrap { overflow-x: auto; }
-  .legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; font-size: 0.82rem; color: #444; }
-  .legend-item { display: flex; align-items: center; gap: 0.4rem; }
-  .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.15); }
-  .swatch.mismatch { background: #fff3cd; }
-  .swatch.fallback { background: #e0e7ff; }
-  .swatch.na { background: #f5f5f5; }
-  .swatch.ok { background: #ffffff; }
+<script src="https://cdn.tailwindcss.com"></script>
+<style type="text/tailwindcss">
+  body { @apply bg-gray-100 text-gray-900; }
+  .btn { @apply inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold transition; }
+  .btn-primary { @apply bg-indigo-600 text-white hover:bg-indigo-700; }
+  .btn-plain { @apply border border-gray-300 text-gray-600 hover:bg-gray-50; }
+  .card { @apply bg-white rounded-xl shadow border border-gray-200; }
+  .pill { @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold; }
+  .pill-neutral { @apply bg-gray-100 text-gray-700 border border-gray-200; }
+  .pill-warning { @apply bg-amber-100 text-amber-800 border border-amber-300; }
+  .pill-info { @apply bg-indigo-100 text-indigo-700 border border-indigo-300; }
+  .alert-error { @apply rounded-lg px-3 py-2 text-sm bg-red-50 text-red-700; }
+  .alert-success { @apply rounded-lg px-3 py-2 text-sm bg-emerald-50 text-emerald-700; }
+  .alert-warning { @apply rounded-lg px-3 py-2 text-sm bg-amber-50 text-amber-800; }
+  .alert-info { @apply rounded-lg px-3 py-2 text-sm bg-indigo-50 text-indigo-700; }
+  .field-label { @apply block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1; }
+  .input-field { @apply w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500; }
+  .version-pill { @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200; font-variant-numeric: tabular-nums; }
+  a.version-pill:hover { @apply bg-indigo-50 border-indigo-300 text-indigo-700; }
+  td.mismatch .version-pill { @apply bg-amber-100 text-amber-800 border-amber-300 font-semibold; }
+  td.fallback .version-pill { @apply bg-indigo-100 text-indigo-700 border-indigo-300; }
+  .spinner { width: 14px; height: 14px; border: 2px solid #e5e7eb; border-top-color: #4f46e5; border-radius: 9999px; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  dialog::backdrop { background: rgba(15,17,21,0.45); }
 </style>
 </head>
-<body>
-  <h1>Repo Version Comparison</h1>
-  <a href="release.html" style="display:inline-block;margin-bottom:1rem;color:#33399b;text-decoration:none;font-size:0.9rem;">View release PR summary &rarr;</a>
-  <div class="legend">
-    <div class="legend-item"><span class="swatch ok"></span> Version read from deployment/&lt;env&gt;/values.yaml (image.tag)</div>
-    <div class="legend-item"><span class="swatch mismatch"></span> Mismatch: base env version differs from its canary counterpart</div>
-    <div class="legend-item"><span class="swatch fallback"></span> No values.yaml found &mdash; version read from Jenkinsfile instead</div>
-    <div class="legend-item"><span class="swatch na"></span> &ldquo;-&rdquo; = no version found in any source for that env</div>
+<body class="min-h-screen">
+  <div class="flex items-center justify-between border-b border-gray-200 bg-white shadow-sm px-6 md:px-10 py-3">
+    <h1 class="text-xl font-bold tracking-tight">Repo Version Comparison</h1>
+    <div class="flex gap-2">
+      <button id="open-promote" class="btn btn-plain rounded-full">Promote preprod &rarr; prod</button>
+      <a href="release.html" class="btn btn-primary rounded-full">View release PR summary &rarr;</a>
+    </div>
   </div>
-  <div id="status"></div>
-  <div class="table-wrap">
-    <table id="result-table" style="display:none">
-      <thead><tr id="header-row"></tr></thead>
-      <tbody id="result-body"></tbody>
-    </table>
+
+  <div class="max-w-[1400px] mx-auto p-6 md:p-10 space-y-6">
+    <p class="text-sm text-gray-500 -mt-4">qa2 / preprod / prod &mdash; base vs canary</p>
+
+    <div class="flex flex-wrap gap-2">
+      <div class="pill pill-warning">Mismatch: base vs canary differ</div>
+    </div>
+
+    <div class="flex items-center gap-3 flex-wrap">
+      <div class="relative" id="service-filter-wrap">
+        <button id="service-filter-btn" type="button" class="btn btn-plain rounded-md">
+          Filter services <span id="service-filter-count" class="ml-1 text-xs text-indigo-600 font-semibold"></span>
+        </button>
+        <div id="service-filter-panel" class="hidden absolute z-10 mt-1 w-72 max-h-80 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg p-2">
+          <input id="service-filter-search" type="text" placeholder="Search services..." class="input-field mb-2 text-xs" />
+          <div id="service-filter-list" class="space-y-1"></div>
+          <div class="flex justify-between mt-2 pt-2 border-t border-gray-100">
+            <button id="service-filter-clear" type="button" class="text-xs text-indigo-600 font-semibold hover:underline">Clear</button>
+            <button id="service-filter-close" type="button" class="text-xs text-gray-600 font-semibold hover:underline">Done</button>
+          </div>
+        </div>
+      </div>
+      <label class="flex items-center gap-2 text-sm text-gray-600">
+        <span>Default deploy env:</span>
+        <select id="default-env-select" class="input-field w-auto"></select>
+      </label>
+    </div>
+
+    <div id="status" class="flex items-center gap-2 text-sm text-gray-500"></div>
+
+    <div class="card overflow-hidden">
+      <div class="overflow-x-auto">
+        <table id="result-table" class="w-full text-sm hidden">
+          <thead><tr id="header-row" class="bg-gray-50 border-b-2 border-gray-200"></tr></thead>
+          <tbody id="result-body" class="divide-y divide-gray-100"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
+
+  <dialog id="deploy-modal" class="rounded-xl shadow-xl p-0 max-w-md w-full">
+    <div class="p-6">
+      <h3 class="font-bold text-lg" id="deploy-title">Deploy</h3>
+      <p class="text-xs text-gray-500 mb-4 font-mono" id="deploy-sub"></p>
+
+      <label class="block">
+        <span class="field-label">Environment</span>
+        <select id="deploy-env" class="input-field"></select>
+      </label>
+
+      <label class="block mt-3">
+        <span class="field-label">Version</span>
+        <input id="deploy-version" type="text" list="deploy-version-history" placeholder="e.g. 4.7.0-1" class="input-field" />
+        <datalist id="deploy-version-history"></datalist>
+      </label>
+
+      <div class="mt-4" id="deploy-note"></div>
+      <div id="deploy-result" class="mt-3 text-sm"></div>
+
+      <div class="flex justify-end gap-2 mt-6">
+        <button class="btn btn-plain rounded-md" id="deploy-cancel">Cancel</button>
+        <button class="btn btn-primary rounded-md" id="deploy-confirm">Deploy</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="promote-modal" class="rounded-xl shadow-xl p-0 max-w-lg w-full">
+    <div class="p-6">
+      <h3 class="font-bold text-lg">Promote preprod &rarr; prod</h3>
+      <p class="text-xs text-gray-500 mb-4">Services below have a preprod version that differs from prod. Remove any you don't want to promote, then create PRs.</p>
+
+      <div id="promote-list" class="max-h-80 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-md"></div>
+      <div id="promote-empty" class="text-sm text-gray-500 py-6 text-center hidden">Nothing to promote — preprod already matches prod everywhere.</div>
+
+      <div id="promote-confirm-box" class="mt-4 hidden"></div>
+      <div id="promote-result" class="mt-3 text-sm space-y-1"></div>
+
+      <div class="flex justify-end gap-2 mt-6">
+        <button class="btn btn-plain rounded-md" id="promote-cancel">Close</button>
+        <button class="btn btn-primary rounded-md" id="promote-create">Create PRs</button>
+      </div>
+    </div>
+  </dialog>
 
 <script>
 const statusEl = document.getElementById('status');
@@ -60,72 +135,442 @@ const PAIRS = [
 ];
 
 function cell(version, href) {
-  if (!version) return '<span class="na">-</span>';
-  if (!href) return version;
-  return `<a class="version-link" href="${href}">${version}</a>`;
+  if (!version) return '<span class="text-gray-300">-</span>';
+  const cls = 'version-pill';
+  if (!href) return `<span class="${cls}">${version}</span>`;
+  return `<a class="${cls}" href="${href}">${version}</a>`;
 }
 
 function detailHref(r, label, envConfig, version) {
+  const target = resolveTarget(r, label, envConfig);
+  if (!target) return null;
+  const qs = new URLSearchParams({ ...target, service: r.service, version });
+  return `detail.html?${qs.toString()}`;
+}
+
+// Resolves which repo/branch/file a given env label maps to for a row,
+// accounting for the Jenkinsfile fallback used by static/testing repos.
+function resolveTarget(r, label, envConfig) {
   const cfg = envConfig[label];
   if (!cfg) return null;
   const repo = cfg.side === 'nonprod' ? r.nonprodRepo : r.prodRepo;
   if (!repo) return null;
   const isFallback = r.sources && r.sources[label] === 'jenkinsfile';
-  const branch = isFallback ? (cfg.side === 'nonprod' ? r.nonprodBranch : r.prodBranch) : cfg.branch;
-  const filePath = isFallback ? 'Jenkinsfile' : `deployment/${cfg.dir}/values.yaml`;
-  const qs = new URLSearchParams({
-    repo,
-    branch,
-    path: filePath,
-    label,
-    service: r.service,
-    version,
+  const branch = cfg.branch;
+  const path = isFallback ? 'Jenkinsfile' : `deployment/${cfg.dir}/values.yaml`;
+  return { repo, branch, path };
+}
+
+const PROD_LABELS = new Set(['prod', 'canary-prod']);
+let rowsByService = {};
+let currentEnvConfig = {};
+
+const modal = document.getElementById('deploy-modal');
+const deployTitle = document.getElementById('deploy-title');
+const deploySub = document.getElementById('deploy-sub');
+const deployEnvSelect = document.getElementById('deploy-env');
+const deployVersionInput = document.getElementById('deploy-version');
+const deployVersionHistory = document.getElementById('deploy-version-history');
+const deployNote = document.getElementById('deploy-note');
+const deployResult = document.getElementById('deploy-result');
+const deployConfirmBtn = document.getElementById('deploy-confirm');
+const deployCancelBtn = document.getElementById('deploy-cancel');
+
+function closeModal() {
+  modal.close();
+  deployResult.textContent = '';
+}
+deployCancelBtn.addEventListener('click', closeModal);
+
+async function openDeployModal(service) {
+  const r = rowsByService[service];
+  if (!r) return;
+  deployResult.textContent = '';
+  deployTitle.textContent = `Deploy — ${service}`;
+
+  const availableLabels = Object.keys(currentEnvConfig).filter(
+    (label) => resolveTarget(r, label, currentEnvConfig) && r.versions[label]
+  );
+  deployEnvSelect.innerHTML = availableLabels.map((l) => `<option value="${l}">${l}</option>`).join('');
+
+  const defaultEnv = localStorage.getItem('defaultDeployEnv');
+  if (defaultEnv && availableLabels.includes(defaultEnv)) deployEnvSelect.value = defaultEnv;
+
+  modal.showModal();
+  await refreshEnvDetails(service);
+}
+
+async function refreshEnvDetails(service) {
+  const r = rowsByService[service];
+  const label = deployEnvSelect.value;
+  const target = resolveTarget(r, label, currentEnvConfig);
+  const currentVersion = r.versions[label];
+
+  deploySub.textContent = target ? `${target.repo} @ ${target.branch} — ${target.path}` : '';
+
+  if (PROD_LABELS.has(label)) {
+    deployNote.innerHTML = '<div class="alert-warning">Prod target: this opens a new branch + Pull Request for review (no direct commit).</div>';
+  } else {
+    deployNote.innerHTML = `<div class="alert-info">This commits directly to the "${target ? target.branch : label}" branch — no PR.</div>`;
+  }
+
+  deployVersionInput.value = currentVersion || '';
+  deployVersionHistory.innerHTML = '';
+  if (!target) return;
+  try {
+    const qs = new URLSearchParams({ repo: target.repo, branch: target.branch, path: target.path });
+    const res = await fetch(`/api/deploy-options?${qs.toString()}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to load versions');
+    const options = data.versions || [];
+    if (currentVersion && !options.includes(currentVersion)) options.unshift(currentVersion);
+    deployVersionHistory.innerHTML = options.map((v) => `<option value="${v}"></option>`).join('');
+  } catch (err) {
+    // datalist is a convenience only — leave the textbox usable even if history fails to load.
+  }
+}
+
+deployEnvSelect.addEventListener('change', () => {
+  const service = deployTitle.textContent.replace('Deploy — ', '');
+  refreshEnvDetails(service);
+});
+
+deployConfirmBtn.addEventListener('click', async () => {
+  const service = deployTitle.textContent.replace('Deploy — ', '');
+  const r = rowsByService[service];
+  const label = deployEnvSelect.value;
+  const target = resolveTarget(r, label, currentEnvConfig);
+  const version = deployVersionInput.value.trim();
+
+  if (!version) {
+    deployResult.innerHTML = '<div class="alert-error">Enter or select a version.</div>';
+    return;
+  }
+  if (!target) return;
+
+  deployConfirmBtn.disabled = true;
+  deployResult.innerHTML = '<span class="spinner inline-block align-middle mr-1"></span> Deploying…';
+  try {
+    const res = await fetch('/api/deploy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...target, label, version, service }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Deploy failed');
+
+    if (data.mode === 'pull-request') {
+      deployResult.innerHTML = `<div class="alert-success">PR opened: <a class="underline font-semibold" href="${data.prUrl}" target="_blank" rel="noopener">${data.prUrl}</a></div>`;
+    } else {
+      deployResult.innerHTML = data.commitUrl
+        ? `<div class="alert-success">Committed directly to ${data.branch}: <a class="underline font-semibold" href="${data.commitUrl}" target="_blank" rel="noopener">${data.commitUrl}</a></div>`
+        : `<div class="alert-success">Committed directly to ${data.branch}.</div>`;
+    }
+  } catch (err) {
+    deployResult.innerHTML = `<div class="alert-error">Error: ${err.message}</div>`;
+  } finally {
+    deployConfirmBtn.disabled = false;
+  }
+});
+
+tbody.addEventListener('click', (e) => {
+  const btn = e.target.closest('.deploy-btn');
+  if (!btn) return;
+  openDeployModal(btn.dataset.service);
+});
+
+let lastData = null;
+
+function servicesFromUrl() {
+  const raw = new URLSearchParams(window.location.search).get('services');
+  return raw ? raw.split(',').filter(Boolean) : null;
+}
+
+function syncServicesUrl() {
+  const qs = new URLSearchParams(window.location.search);
+  if (selectedServices.size === 0) qs.delete('services');
+  else qs.set('services', [...selectedServices].join(','));
+  const newUrl = `${window.location.pathname}${qs.toString() ? '?' + qs.toString() : ''}`;
+  history.replaceState(null, '', newUrl);
+}
+
+let selectedServices = new Set(servicesFromUrl() || JSON.parse(localStorage.getItem('serviceFilter') || '[]'));
+
+function renderTable(data) {
+  const th = (text) => `<th class="sticky top-0 bg-gray-50 uppercase text-xs tracking-wide text-gray-500 font-semibold text-left px-4 py-3">${text}</th>`;
+  headerRow.innerHTML =
+    th('Service') + data.envLabels.map(th).join('') + th('Deploy');
+
+  const filtered = selectedServices.size === 0
+    ? data.results
+    : data.results.filter((r) => selectedServices.has(r.service));
+
+  tbody.innerHTML = '';
+  filtered.forEach((r) => {
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-gray-50';
+    const cells = data.envLabels
+      .map((label) => {
+        const version = r.versions[label];
+        const pair = PAIRS.find((p) => p.includes(label));
+        let mismatch = false;
+        if (pair) {
+          const [a, b] = pair;
+          const va = r.versions[a];
+          const vb = r.versions[b];
+          mismatch = va && vb && va !== vb;
+        }
+        const isFallback = r.sources && r.sources[label] === 'jenkinsfile';
+        const cls = mismatch ? 'mismatch' : isFallback ? 'fallback' : '';
+        const href = version ? detailHref(r, label, data.envConfig, version) : null;
+        return `<td class="px-4 py-3 whitespace-nowrap ${cls}">${cell(version, href)}</td>`;
+      })
+      .join('');
+    const deployCell = `<td class="px-4 py-3 whitespace-nowrap"><button class="btn btn-primary rounded-full text-xs py-1 px-3 deploy-btn" data-service="${r.service}">Deploy</button></td>`;
+    tr.innerHTML = `<td class="px-4 py-3 whitespace-nowrap font-semibold">${r.service}</td>${cells}${deployCell}`;
+    tbody.appendChild(tr);
   });
-  return `detail.html?${qs.toString()}`;
+  table.classList.remove('hidden');
+  statusEl.textContent = `${filtered.length} of ${data.results.length} services shown. Click a version to see who changed it and when.`;
 }
 
 async function load() {
-  statusEl.textContent = 'Fetching versions across all environments...';
-  table.style.display = 'none';
+  statusEl.innerHTML = '<span class="spinner"></span> Fetching versions across all environments...';
+  table.classList.add('hidden');
   try {
     const res = await fetch('/api/versions/compare');
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Request failed');
 
-    headerRow.innerHTML =
-      '<th>Service</th>' + data.envLabels.map((l) => `<th>${l}</th>`).join('');
+    rowsByService = {};
+    data.results.forEach((r) => { rowsByService[r.service] = r; });
+    currentEnvConfig = data.envConfig;
+    lastData = data;
 
-    tbody.innerHTML = '';
-    data.results.forEach((r) => {
-      const tr = document.createElement('tr');
-      const cells = data.envLabels
-        .map((label) => {
-          const version = r.versions[label];
-          const pair = PAIRS.find((p) => p.includes(label));
-          let mismatch = false;
-          if (pair) {
-            const [a, b] = pair;
-            const va = r.versions[a];
-            const vb = r.versions[b];
-            mismatch = va && vb && va !== vb;
-          }
-          const isFallback = r.sources && r.sources[label] === 'jenkinsfile';
-          const cls = mismatch ? 'mismatch' : isFallback ? 'fallback' : '';
-          const href = version ? detailHref(r, label, data.envConfig, version) : null;
-          return `<td class="${cls}">${cell(version, href)}</td>`;
-        })
-        .join('');
-      tr.innerHTML = `<td>${r.service}</td>${cells}`;
-      tbody.appendChild(tr);
-    });
-    table.style.display = '';
-    statusEl.textContent = `${data.results.length} services compared. Highlighted cells = base vs canary version mismatch. Click a version to see who changed it and when.`;
+    populateServiceFilter(data.results.map((r) => r.service));
+    syncServicesUrl();
+    populateDefaultEnvSelect(data.envLabels);
+    renderTable(data);
   } catch (err) {
-    statusEl.innerHTML = `<span class="err">Error: ${err.message}</span>`;
+    statusEl.innerHTML = `<div class="alert-error">Error: ${err.message}</div>`;
   }
 }
 
 load();
+
+// --- Service filter ------------------------------------------------------
+
+const serviceFilterBtn = document.getElementById('service-filter-btn');
+const serviceFilterPanel = document.getElementById('service-filter-panel');
+const serviceFilterList = document.getElementById('service-filter-list');
+const serviceFilterSearch = document.getElementById('service-filter-search');
+const serviceFilterCount = document.getElementById('service-filter-count');
+const serviceFilterClear = document.getElementById('service-filter-clear');
+const serviceFilterClose = document.getElementById('service-filter-close');
+
+let allServiceNames = [];
+
+function updateServiceFilterCount() {
+  serviceFilterCount.textContent = selectedServices.size > 0 ? `(${selectedServices.size})` : '';
+}
+
+function renderServiceFilterList(filterText) {
+  const q = (filterText || '').toLowerCase();
+  serviceFilterList.innerHTML = allServiceNames
+    .filter((s) => s.toLowerCase().includes(q))
+    .map(
+      (s) => `
+    <label class="flex items-center gap-2 text-sm px-1 py-0.5 rounded hover:bg-gray-50 cursor-pointer">
+      <input type="checkbox" class="service-filter-checkbox" value="${s}" ${selectedServices.has(s) ? 'checked' : ''} />
+      <span>${s}</span>
+    </label>`
+    )
+    .join('');
+}
+
+function populateServiceFilter(services) {
+  allServiceNames = services;
+  // drop any stale selections for services that no longer exist
+  selectedServices = new Set([...selectedServices].filter((s) => services.includes(s)));
+  renderServiceFilterList(serviceFilterSearch.value);
+  updateServiceFilterCount();
+}
+
+serviceFilterBtn.addEventListener('click', () => {
+  serviceFilterPanel.classList.toggle('hidden');
+});
+
+document.addEventListener('click', (e) => {
+  if (!document.getElementById('service-filter-wrap').contains(e.target)) {
+    serviceFilterPanel.classList.add('hidden');
+  }
+});
+
+serviceFilterSearch.addEventListener('input', () => renderServiceFilterList(serviceFilterSearch.value));
+
+serviceFilterList.addEventListener('change', (e) => {
+  const cb = e.target.closest('.service-filter-checkbox');
+  if (!cb) return;
+  if (cb.checked) selectedServices.add(cb.value);
+  else selectedServices.delete(cb.value);
+  localStorage.setItem('serviceFilter', JSON.stringify([...selectedServices]));
+  syncServicesUrl();
+  updateServiceFilterCount();
+  if (lastData) renderTable(lastData);
+});
+
+serviceFilterClear.addEventListener('click', () => {
+  selectedServices = new Set();
+  localStorage.setItem('serviceFilter', '[]');
+  syncServicesUrl();
+  renderServiceFilterList(serviceFilterSearch.value);
+  updateServiceFilterCount();
+  if (lastData) renderTable(lastData);
+});
+
+serviceFilterClose.addEventListener('click', () => serviceFilterPanel.classList.add('hidden'));
+
+// --- Default deploy environment -------------------------------------------
+
+const defaultEnvSelect = document.getElementById('default-env-select');
+
+function populateDefaultEnvSelect(envLabels) {
+  const saved = localStorage.getItem('defaultDeployEnv') || '';
+  defaultEnvSelect.innerHTML =
+    '<option value="">(ask each time)</option>' +
+    envLabels.map((l) => `<option value="${l}">${l}</option>`).join('');
+  defaultEnvSelect.value = envLabels.includes(saved) ? saved : '';
+}
+
+defaultEnvSelect.addEventListener('change', () => {
+  localStorage.setItem('defaultDeployEnv', defaultEnvSelect.value);
+});
+
+// --- Promote preprod -> prod --------------------------------------------
+
+const promoteModal = document.getElementById('promote-modal');
+const promoteList = document.getElementById('promote-list');
+const promoteEmpty = document.getElementById('promote-empty');
+const promoteConfirmBox = document.getElementById('promote-confirm-box');
+const promoteResult = document.getElementById('promote-result');
+const promoteCreateBtn = document.getElementById('promote-create');
+const promoteCancelBtn = document.getElementById('promote-cancel');
+const openPromoteBtn = document.getElementById('open-promote');
+
+let promoteCandidates = [];
+
+function computePromoteCandidates() {
+  const candidates = [];
+  Object.values(rowsByService).forEach((r) => {
+    const preprodVersion = r.versions.preprod;
+    const prodVersion = r.versions.prod;
+    if (!preprodVersion || preprodVersion === prodVersion) return;
+    const target = resolveTarget(r, 'prod', currentEnvConfig);
+    if (!target) return;
+    candidates.push({ service: r.service, version: preprodVersion, fromVersion: prodVersion, target });
+  });
+  return candidates;
+}
+
+function renderPromoteList() {
+  promoteConfirmBox.classList.add('hidden');
+  promoteConfirmBox.innerHTML = '';
+  promoteResult.innerHTML = '';
+
+  if (promoteCandidates.length === 0) {
+    promoteList.innerHTML = '';
+    promoteEmpty.classList.remove('hidden');
+    promoteCreateBtn.disabled = true;
+    return;
+  }
+  promoteEmpty.classList.add('hidden');
+  promoteCreateBtn.disabled = false;
+
+  promoteList.innerHTML = promoteCandidates
+    .map(
+      (c, i) => `
+    <div class="flex items-center justify-between gap-3 px-3 py-2">
+      <div>
+        <div class="font-semibold text-sm">${c.service}</div>
+        <div class="text-xs text-gray-500">${c.fromVersion || '-'} &rarr; <span class="font-semibold text-gray-700">${c.version}</span></div>
+      </div>
+      <button class="text-xs font-semibold text-red-600 border border-red-300 rounded-md px-2 py-1 hover:bg-red-50 promote-remove" data-index="${i}">Remove</button>
+    </div>`
+    )
+    .join('');
+}
+
+promoteList.addEventListener('click', (e) => {
+  const btn = e.target.closest('.promote-remove');
+  if (!btn) return;
+  const idx = Number(btn.dataset.index);
+  promoteCandidates.splice(idx, 1);
+  renderPromoteList();
+});
+
+openPromoteBtn.addEventListener('click', () => {
+  promoteCandidates = computePromoteCandidates();
+  renderPromoteList();
+  promoteModal.showModal();
+});
+
+promoteCancelBtn.addEventListener('click', () => promoteModal.close());
+
+promoteCreateBtn.addEventListener('click', () => {
+  if (promoteCandidates.length === 0) return;
+
+  promoteConfirmBox.classList.remove('hidden');
+  promoteConfirmBox.innerHTML = `
+    <div class="alert-warning">
+      <p class="mb-2">Create ${promoteCandidates.length} PR${promoteCandidates.length === 1 ? '' : 's'} into prod for: ${promoteCandidates
+        .map((c) => c.service)
+        .join(', ')}?</p>
+      <div class="flex gap-2">
+        <button class="btn btn-plain rounded-md text-xs py-1" id="promote-confirm-no">Cancel</button>
+        <button class="btn btn-primary rounded-md text-xs py-1" id="promote-confirm-yes">Yes, create PRs</button>
+      </div>
+    </div>`;
+
+  document.getElementById('promote-confirm-no').addEventListener('click', () => {
+    promoteConfirmBox.classList.add('hidden');
+    promoteConfirmBox.innerHTML = '';
+  });
+
+  document.getElementById('promote-confirm-yes').addEventListener('click', async () => {
+    promoteConfirmBox.classList.add('hidden');
+    promoteCreateBtn.disabled = true;
+    promoteResult.innerHTML = '<span class="spinner inline-block align-middle mr-1"></span> Creating PRs…';
+
+    const results = await Promise.all(
+      promoteCandidates.map(async (c) => {
+        try {
+          const res = await fetch('/api/deploy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...c.target, label: 'prod', version: c.version, service: c.service }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Deploy failed');
+          return { service: c.service, ok: true, prUrl: data.prUrl };
+        } catch (err) {
+          return { service: c.service, ok: false, error: err.message };
+        }
+      })
+    );
+
+    promoteResult.innerHTML = results
+      .map((r) =>
+        r.ok
+          ? `<div class="alert-success">${r.service}: <a class="underline font-semibold" href="${r.prUrl}" target="_blank" rel="noopener">${r.prUrl}</a></div>`
+          : `<div class="alert-error">${r.service}: ${r.error}</div>`
+      )
+      .join('');
+    promoteCreateBtn.disabled = false;
+    promoteCandidates = [];
+    promoteList.innerHTML = '';
+    promoteEmpty.classList.add('hidden');
+  });
+});
 </script>
 </body>
 </html>

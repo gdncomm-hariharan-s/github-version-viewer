@@ -2,42 +2,37 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Release PR Summary</title>
-<style>
-  body { font-family: -apple-system, Arial, sans-serif; margin: 2rem; background: #f7f8fa; color: #1a1a1a; }
-  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
-  .back { display: inline-block; margin-bottom: 1.2rem; color: #33399b; text-decoration: none; font-size: 0.9rem; }
-  .back:hover { text-decoration: underline; }
-  #status { margin-bottom: 1rem; color: #555; font-size: 0.9rem; }
-  .err { color: #b00020; }
-  .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1rem 1.2rem; margin-bottom: 1rem; }
-  .card h2 { margin: 0 0 0.3rem; font-size: 1.05rem; }
-  .crf { color: #33399b; font-weight: 600; font-size: 0.85rem; }
-  .crf a { color: inherit; }
-  .pr-row { display: flex; align-items: baseline; gap: 0.6rem; padding: 0.3rem 0; border-top: 1px solid #f0f0f2; }
-  .pr-row:first-of-type { border-top: none; margin-top: 0.5rem; }
-  .pr-label { display: inline-block; min-width: 90px; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; padding: 0.1rem 0.5rem; border-radius: 4px; }
-  .pr-label.static { background: #e0e7ff; color: #33399b; }
-  .pr-label.canary { background: #fff3cd; color: #8a6100; }
-  .pr-label.non-canary { background: #e6f4ea; color: #1e6b3a; }
-  .pr-meta { color: #888; font-size: 0.8rem; }
-  .automated-flag { color: #b00020; font-size: 0.75rem; font-weight: 600; margin-left: 0.3rem; }
-  a.pr-link { color: #1a1a1a; text-decoration: none; }
-  a.pr-link:hover { text-decoration: underline; }
-  .copy-btn { border: 1px solid #ccc; background: white; border-radius: 4px; font-size: 0.75rem; padding: 0.1rem 0.5rem; cursor: pointer; color: #444; }
-  .copy-btn:hover { background: #f0f0f2; }
-  .copy-btn.copied { background: #e6f4ea; color: #1e6b3a; border-color: #1e6b3a; }
-  .copy-all-btn { border: 1px solid #33399b; background: white; color: #33399b; border-radius: 6px; font-size: 0.85rem; padding: 0.4rem 0.9rem; cursor: pointer; margin-bottom: 1rem; }
-  .copy-all-btn:hover { background: #eef; }
-  .copy-all-btn.copied { background: #e6f4ea; color: #1e6b3a; border-color: #1e6b3a; }
+<script src="https://cdn.tailwindcss.com"></script>
+<style type="text/tailwindcss">
+  body { @apply bg-gray-100 text-gray-900; }
+  .card { @apply bg-white rounded-xl shadow border border-gray-200; }
+  .pill { @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase; }
+  .pr-label.static { @apply bg-indigo-100 text-indigo-700 border border-indigo-300; }
+  .pr-label.canary { @apply bg-amber-100 text-amber-800 border border-amber-300; }
+  .pr-label.non-canary { @apply bg-emerald-100 text-emerald-800 border border-emerald-300; }
+  .alert-error { @apply rounded-lg px-3 py-2 text-sm bg-red-50 text-red-700; }
+  .btn { @apply inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold transition; }
+  .btn-primary { @apply bg-indigo-600 text-white hover:bg-indigo-700; }
+  .btn-plain { @apply border border-gray-300 text-gray-600 hover:bg-gray-50; }
+  .spinner { width: 14px; height: 14px; border: 2px solid #e5e7eb; border-top-color: #4f46e5; border-radius: 9999px; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
-<body>
-  <a class="back" href="index.html">&larr; Back to comparison</a>
-  <h1>Release PR Summary</h1>
-  <div id="status">Loading open PRs across dgp-deployment repos...</div>
-  <button id="copy-all" class="copy-all-btn" style="display:none">Copy formatted list</button>
-  <div id="cards"></div>
+<body class="min-h-screen">
+  <div class="flex items-center justify-between border-b border-gray-200 bg-white shadow-sm px-6 md:px-10 py-3">
+    <h1 class="text-xl font-bold tracking-tight">Release PR Summary</h1>
+    <a class="btn btn-plain rounded-md" href="index.html">&larr; Back to comparison</a>
+  </div>
+
+  <div class="max-w-[1000px] mx-auto p-6 md:p-10 space-y-4">
+    <div id="status" class="flex items-center gap-2 text-sm text-gray-500">
+      <span class="spinner"></span> Loading open PRs across dgp-deployment repos...
+    </div>
+    <button id="copy-all" class="btn btn-primary rounded-full hidden">Copy formatted list</button>
+    <div id="cards"></div>
+  </div>
 
 <script>
 const statusEl = document.getElementById('status');
@@ -85,10 +80,10 @@ async function copyText(text, btn, revertLabel) {
   }
   const original = btn.textContent;
   btn.textContent = 'Copied!';
-  btn.classList.add('copied');
+  btn.classList.add('bg-emerald-100', 'text-emerald-800');
   setTimeout(() => {
     btn.textContent = revertLabel || original;
-    btn.classList.remove('copied');
+    btn.classList.remove('bg-emerald-100', 'text-emerald-800');
   }, 1500);
 }
 
@@ -111,33 +106,33 @@ async function load() {
     cards.innerHTML = '';
     data.results.forEach((r) => {
       const card = document.createElement('div');
-      card.className = 'card';
+      card.className = 'card p-5 mb-4';
       const crfHtml = r.crf
-        ? `<div class="crf"><a href="https://gdncomm.atlassian.net/browse/${r.crf}" target="_blank" rel="noopener">${r.crf}</a></div>`
+        ? `<div class="mb-2"><a class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-300" href="https://gdncomm.atlassian.net/browse/${r.crf}" target="_blank" rel="noopener">${r.crf}</a></div>`
         : '';
       const prsSorted = [...r.prs].sort((a, b) => (LABEL_ORDER[a.label] ?? 9) - (LABEL_ORDER[b.label] ?? 9));
       const prRows = prsSorted
         .map(
           (pr) => `
-        <div class="pr-row">
-          <span class="pr-label ${pr.label}">${pr.label}</span>
-          <a class="pr-link" href="${pr.url}" target="_blank" rel="noopener">${pr.repo.replace('gdncomm/', '')}#${pr.number}</a>
-          <button class="copy-btn" data-url="${pr.url}">Copy</button>
-          <span class="pr-meta">${pr.title} &middot; ${pr.author} &middot; ${fmtDate(pr.createdAt)}</span>
-          ${pr.automated ? '<span class="automated-flag">AUTOMATED &mdash; not a release PR</span>' : ''}
+        <div class="flex flex-wrap items-center gap-3 py-2 border-t border-gray-200 first:border-t-0 first:pt-0">
+          <span class="pill pr-label ${pr.label} min-w-[84px] justify-center">${pr.label}</span>
+          <a class="font-semibold text-gray-900 hover:underline" href="${pr.url}" target="_blank" rel="noopener">${pr.repo.replace('gdncomm/', '')}#${pr.number}</a>
+          <button class="text-xs font-semibold text-gray-500 border border-gray-300 rounded-md px-2 py-0.5 hover:bg-gray-100 copy-btn" data-url="${pr.url}">Copy</button>
+          <span class="text-xs text-gray-500">${pr.title} &middot; ${pr.author} &middot; ${fmtDate(pr.createdAt)}</span>
+          ${pr.automated ? '<span class="pill bg-red-100 text-red-700 border border-red-300">AUTOMATED &mdash; not a release PR</span>' : ''}
         </div>`
         )
         .join('');
-      card.innerHTML = `<h2>${r.service}</h2>${crfHtml}${prRows}`;
+      card.innerHTML = `<h2 class="font-bold text-lg mb-1">${r.service}</h2>${crfHtml}${prRows}`;
       cards.appendChild(card);
     });
 
     formattedList = buildFormattedList(data.results);
-    copyAllBtn.style.display = formattedList ? '' : 'none';
+    copyAllBtn.classList.toggle('hidden', !formattedList || data.results.length === 0);
 
     statusEl.textContent = `${data.results.length} services with open release PRs.`;
   } catch (err) {
-    statusEl.innerHTML = `<span class="err">Error: ${err.message}</span>`;
+    statusEl.innerHTML = `<div class="alert-error">Error: ${err.message}</div>`;
   }
 }
 

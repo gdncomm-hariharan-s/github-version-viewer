@@ -2,36 +2,47 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Version History</title>
-<style>
-  body { font-family: -apple-system, Arial, sans-serif; margin: 2rem; background: #f7f8fa; color: #1a1a1a; }
-  h1 { font-size: 1.3rem; margin-bottom: 0.2rem; }
-  .subtitle { color: #555; font-size: 0.9rem; margin-bottom: 1.2rem; }
-  .back { display: inline-block; margin-bottom: 1.2rem; color: #33399b; text-decoration: none; font-size: 0.9rem; }
-  .back:hover { text-decoration: underline; }
-  table { border-collapse: collapse; width: 100%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.88rem; }
-  th, td { text-align: left; padding: 0.5rem 0.8rem; border-bottom: 1px solid #eee; }
-  th { background: #f0f0f2; }
-  tr.current { background: #eef8ee; }
-  .version { font-weight: 600; }
-  .meta { color: #888; font-size: 0.8rem; }
-  a.commit-link { color: #33399b; text-decoration: none; }
-  a.commit-link:hover { text-decoration: underline; }
-  #status { color: #555; font-size: 0.9rem; }
-  .err { color: #b00020; }
+<script src="https://cdn.tailwindcss.com"></script>
+<style type="text/tailwindcss">
+  body { @apply bg-gray-100 text-gray-900; }
+  .card { @apply bg-white rounded-xl shadow border border-gray-200; }
+  .alert-error { @apply rounded-lg px-3 py-2 text-sm bg-red-50 text-red-700; }
+  .version-pill { @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200; font-variant-numeric: tabular-nums; }
+  tr.current td { @apply bg-emerald-50; }
+  tr.current .version-pill { @apply bg-emerald-100 text-emerald-800 border-emerald-300; }
+  .spinner { width: 14px; height: 14px; border: 2px solid #e5e7eb; border-top-color: #4f46e5; border-radius: 9999px; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
-<body>
-  <a class="back" href="index.html">&larr; Back to comparison</a>
-  <h1 id="title">Version history</h1>
-  <div class="subtitle" id="subtitle"></div>
-  <div id="status">Loading...</div>
-  <table id="result-table" style="display:none">
-    <thead>
-      <tr><th>Version</th><th>Changed</th><th>Author</th><th>Commit</th></tr>
-    </thead>
-    <tbody id="result-body"></tbody>
-  </table>
+<body class="min-h-screen">
+  <div class="flex items-center justify-between border-b border-gray-200 bg-white shadow-sm px-6 md:px-10 py-3">
+    <h1 id="title" class="text-xl font-bold">Version history</h1>
+    <a class="text-sm font-semibold text-gray-600 hover:bg-gray-100 px-3 py-1.5 rounded-md" href="index.html">&larr; Back to comparison</a>
+  </div>
+
+  <div class="max-w-[900px] mx-auto p-6 md:p-10 space-y-4">
+    <p id="subtitle" class="text-xs text-gray-500 -mt-2 font-mono"></p>
+    <div id="status" class="flex items-center gap-2 text-sm text-gray-500">
+      <span class="spinner"></span> Loading...
+    </div>
+    <div class="card overflow-hidden">
+      <div class="overflow-x-auto">
+        <table id="result-table" class="w-full text-sm hidden">
+          <thead>
+            <tr class="bg-gray-50 border-b-2 border-gray-200">
+              <th class="uppercase text-xs tracking-wide text-gray-500 font-semibold text-left px-4 py-3">Version</th>
+              <th class="uppercase text-xs tracking-wide text-gray-500 font-semibold text-left px-4 py-3">Changed</th>
+              <th class="uppercase text-xs tracking-wide text-gray-500 font-semibold text-left px-4 py-3">Author</th>
+              <th class="uppercase text-xs tracking-wide text-gray-500 font-semibold text-left px-4 py-3">Commit</th>
+            </tr>
+          </thead>
+          <tbody id="result-body" class="divide-y divide-gray-100"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
 <script>
 const params = new URLSearchParams(window.location.search);
@@ -56,7 +67,7 @@ function fmtDate(iso) {
 
 async function load() {
   if (!repo || !branch || !path) {
-    statusEl.innerHTML = '<span class="err">Missing repo/branch/path in URL.</span>';
+    statusEl.innerHTML = '<div class="alert-error">Missing repo/branch/path in URL.</div>';
     return;
   }
   try {
@@ -71,21 +82,22 @@ async function load() {
     tbody.innerHTML = '';
     data.history.forEach((h) => {
       const tr = document.createElement('tr');
+      tr.className = 'hover:bg-gray-50';
       if (currentVersion && h.version === currentVersion) tr.classList.add('current');
       tr.innerHTML = `
-        <td class="version">${h.version || '-'}</td>
-        <td>${fmtDate(h.date)}</td>
-        <td>${h.author}</td>
-        <td><a class="commit-link" href="${h.htmlUrl}" target="_blank" rel="noopener">${h.shortSha}</a> <span class="meta">${h.message}</span></td>
+        <td class="px-4 py-3 whitespace-nowrap"><span class="version-pill">${h.version || '-'}</span></td>
+        <td class="px-4 py-3 whitespace-nowrap">${fmtDate(h.date)}</td>
+        <td class="px-4 py-3 whitespace-nowrap">${h.author}</td>
+        <td class="px-4 py-3"><a class="text-indigo-600 hover:underline font-semibold" href="${h.htmlUrl}" target="_blank" rel="noopener">${h.shortSha}</a> <span class="text-gray-500 text-xs">${h.message}</span></td>
       `;
       tbody.appendChild(tr);
     });
-    table.style.display = '';
+    table.classList.remove('hidden');
     statusEl.textContent = data.history.length
       ? `Showing last ${data.history.length} commits touching this file.`
       : 'No commit history found for this file.';
   } catch (err) {
-    statusEl.innerHTML = `<span class="err">Error: ${err.message}</span>`;
+    statusEl.innerHTML = `<div class="alert-error">Error: ${err.message}</div>`;
   }
 }
 

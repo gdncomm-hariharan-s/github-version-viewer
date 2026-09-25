@@ -10,7 +10,7 @@ Internal tool for comparing deployed versions of GDN digital-products services a
 - **Release PR summary** (`release.html`) — lists today's open, non-automated release PRs per service (static / canary / non-canary), tagged with the matching Jira CRF ticket, with copy-to-clipboard for individual PR links and a combined formatted list.
 - **Deploy from the UI** — per-row **Deploy** button opens a modal (environment dropdown limited to envs the service actually has, version textbox with autocomplete from past versions). Commits directly for `qa2`/`preprod` environments; opens a branch + PR for `prod` environments. A "Default deploy env" dropdown lets you skip picking the environment every time.
 - **Bulk promote preprod → prod** — lists every service where `preprod` differs from `prod`, lets you drop rows you don't want, asks for confirmation, then bulk-creates PRs and reports the results.
-- **Lock a service/env** — per-row **Lock** button locks a specific (service, env) pair (name + optional reason), blocking Deploy/Reset/Promote for it; a padlock on the version pill shows who locked it (hover for the reason). Unlocking is unrestricted — a visible social signal, not access control. Backed by Postgres (`DATABASE_URL`); if the DB is unreachable, lock badges just don't show and Deploy/Reset/Promote proceed as if unlocked (fail-open) rather than the app breaking.
+- **Lock a service/env** — per-row **Lock** button locks a specific (service, env) pair (optional reason), blocking Deploy/Restart/Promote for it; a padlock on the version pill shows who locked it (hover for details). Your identity is a GitHub username, verified once against the GitHub API and remembered in the browser (`localStorage`) — only the original locker can unlock it. Backed by Postgres (`DATABASE_URL`); if the DB is unreachable, lock badges just don't show and Deploy/Restart/Promote proceed as if unlocked (fail-open) rather than the app breaking.
 
 ## Requirements
 
@@ -49,6 +49,7 @@ lib/compare.js         Business logic: buildVersionsCompare, buildReleasePrs
 lib/jira.js           Jira ADF document helpers (CRF update)
 lib/db.js             Postgres pool + idempotent schema init
 lib/locks.js          Lock table queries (list/get/create/delete)
+routes/github-user.js Validates a GitHub username exists (lock identity)
 routes/*.js         One Express router per feature area, mounted via routes/index.js
 public/index.html   Main comparison dashboard
 public/detail.html  Per-file commit history view
@@ -77,7 +78,7 @@ Measured cold-cache cost per endpoint (direct in-process instrumentation, not th
 | `/api/file-history` | detail.html load | **21** (same code path) | 0 | ~1.8s | ~2ms if within 60s gh-cache |
 | `/api/refresh-version` | manual per-service refresh | 2 | 0 | ~800-900ms | always live by design |
 
-`/api/deploy`, `/api/reset`, `/api/jira/update-crf` weren't load-tested live (they write real commits/PRs) — by code inspection they cost 2 REST calls for a direct commit (non-prod) or 5 for a PR (prod).
+`/api/deploy`, `/api/restart`, `/api/jira/update-crf` weren't load-tested live (they write real commits/PRs) — by code inspection they cost 2 REST calls for a direct commit (non-prod) or 5 for a PR (prod).
 
 **Known unoptimized hotspots** (candidates for the same GraphQL-batching treatment applied to `versions/compare`):
 1. `release-prs` — one `fetchRecentPrs` REST call per prod repo, unbatched; scales linearly as repos grow.
@@ -89,4 +90,4 @@ Measured cold-cache cost per endpoint (direct in-process instrumentation, not th
 
 - Access is intended to be restricted to the internal VPN/network; there is no authentication built into the app itself.
 - Version edits use regex-based patching of YAML/Groovy text rather than a full YAML parser, so they only support the `image:\n  tag:` pattern and known `Jenkinsfile version` lines.
-- Locking is a visible/social signal, not access control — anyone can lock or unlock anything, matching the app's lack of auth. The Postgres dependency is fail-open by design: if it's unreachable, Deploy/Reset/Promote proceed as if unlocked (a DB outage never blocks an otherwise-working deploy path) and lock badges simply stop showing until it's back.
+- Locking is still a visible signal rather than real access control (there's no login/session system in this app), but unlocking is gated: only the GitHub username that created the lock can remove it. `GET /api/github-user` validates a typed username is a real GitHub account before it's trusted as an identity or stored client-side. Enforcement is server-side (`DELETE /api/locks` returns `403` for anyone else), though since nothing logs in, it only holds as long as people don't hand-craft requests — same trust boundary as the rest of the app. The Postgres dependency is fail-open by design: if it's unreachable, Deploy/Restart/Promote proceed as if unlocked (a DB outage never blocks an otherwise-working deploy path) and lock badges simply stop showing until it's back.

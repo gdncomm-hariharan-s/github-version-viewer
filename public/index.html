@@ -113,22 +113,22 @@
     </div>
   </dialog>
 
-  <dialog id="reset-modal" class="rounded-xl shadow-xl p-0 max-w-md w-full">
+  <dialog id="restart-modal" class="rounded-xl shadow-xl p-0 max-w-md w-full">
     <div class="p-6">
-      <h3 class="font-bold text-lg" id="reset-title">Reset</h3>
-      <p class="text-xs text-gray-500 mb-4 font-mono" id="reset-sub"></p>
+      <h3 class="font-bold text-lg" id="restart-title">Restart</h3>
+      <p class="text-xs text-gray-500 mb-4 font-mono" id="restart-sub"></p>
 
       <label class="block">
         <span class="field-label">Environment</span>
-        <select id="reset-env" class="input-field"></select>
+        <select id="restart-env" class="input-field"></select>
       </label>
 
-      <div class="mt-4" id="reset-note"></div>
-      <div id="reset-result" class="mt-3 text-sm"></div>
+      <div class="mt-4" id="restart-note"></div>
+      <div id="restart-result" class="mt-3 text-sm"></div>
 
       <div class="flex justify-end gap-2 mt-6">
-        <button class="btn btn-plain rounded-md" id="reset-cancel">Cancel</button>
-        <button class="btn btn-warning rounded-md" id="reset-confirm">Reset (force redeploy)</button>
+        <button class="btn btn-plain rounded-md" id="restart-cancel">Cancel</button>
+        <button class="btn btn-warning rounded-md" id="restart-confirm">Restart (force redeploy)</button>
       </div>
     </div>
   </dialog>
@@ -138,14 +138,23 @@
       <h3 class="font-bold text-lg" id="lock-title">Lock</h3>
       <p class="text-xs text-gray-500 mb-4 font-mono" id="lock-sub"></p>
 
+      <div id="lock-identity" class="text-xs bg-gray-50 border border-gray-200 rounded-md px-3 py-2 mb-4 flex items-center gap-2 flex-wrap">
+        <span id="lock-identity-unknown" class="flex items-center gap-2 flex-wrap">
+          <span class="text-gray-500">Your GitHub username:</span>
+          <input id="lock-identity-input" type="text" placeholder="e.g. hariharan-s" class="input-field !w-36 !py-1 !text-xs" />
+          <button type="button" class="btn btn-plain rounded-md !py-1 !px-2 !text-xs" id="lock-identity-verify">Verify</button>
+        </span>
+        <span id="lock-identity-known" class="text-gray-700" style="display:none">
+          You are <span class="font-semibold" id="lock-identity-name"></span>
+          <button type="button" class="text-indigo-600 underline ml-1" id="lock-identity-change">not you?</button>
+        </span>
+      </div>
+      <div id="lock-identity-error" class="text-xs text-red-600 mb-3"></div>
+
       <div id="lock-create-fields">
         <label class="block">
           <span class="field-label">Environment</span>
           <select id="lock-env" class="input-field"></select>
-        </label>
-        <label class="block mt-3">
-          <span class="field-label">Your name</span>
-          <input id="lock-name" type="text" placeholder="e.g. hariharan.s" class="input-field" />
         </label>
         <label class="block mt-3">
           <span class="field-label">Reason (optional)</span>
@@ -418,45 +427,45 @@ tbody.addEventListener('click', (e) => {
   openDeployModal(btn.dataset.service);
 });
 
-// --- Reset (force redeploy via restart-tag bump) --------------------------
+// --- Restart (force redeploy via restart-tag bump) --------------------------
 
-const resetModal = document.getElementById('reset-modal');
-const resetTitle = document.getElementById('reset-title');
-const resetSub = document.getElementById('reset-sub');
-const resetEnvSelect = document.getElementById('reset-env');
-const resetNote = document.getElementById('reset-note');
-const resetResult = document.getElementById('reset-result');
-const resetConfirmBtn = document.getElementById('reset-confirm');
-const resetCancelBtn = document.getElementById('reset-cancel');
+const restartModal = document.getElementById('restart-modal');
+const restartTitle = document.getElementById('restart-title');
+const restartSub = document.getElementById('restart-sub');
+const restartEnvSelect = document.getElementById('restart-env');
+const restartNote = document.getElementById('restart-note');
+const restartResult = document.getElementById('restart-result');
+const restartConfirmBtn = document.getElementById('restart-confirm');
+const restartCancelBtn = document.getElementById('restart-cancel');
 
-resetCancelBtn.addEventListener('click', () => resetModal.close());
+restartCancelBtn.addEventListener('click', () => restartModal.close());
 
 // Same reasoning as the deploy modal's close handler — re-sync this row from
 // GitHub rather than trusting only the optimistic local update.
-resetModal.addEventListener('close', () => {
-  const service = resetTitle.textContent.replace('Reset — ', '');
-  const label = resetEnvSelect.value;
-  resetResult.textContent = '';
+restartModal.addEventListener('close', () => {
+  const service = restartTitle.textContent.replace('Restart — ', '');
+  const label = restartEnvSelect.value;
+  restartResult.textContent = '';
   refreshRowAfterDeployClose(service, label);
 });
 
-function refreshResetNote(service) {
+function refreshRestartNote(service) {
   const r = rowsByService[service];
-  const label = resetEnvSelect.value;
+  const label = restartEnvSelect.value;
   const target = resolveTarget(r, label, currentEnvConfig);
-  resetSub.textContent = target ? `${target.repo} @ ${target.branch} — ${target.path}` : '';
+  restartSub.textContent = target ? `${target.repo} @ ${target.branch} — ${target.path}` : '';
   if (PROD_LABELS.has(label)) {
-    resetNote.innerHTML = '<div class="alert-warning">Prod target: this opens a new branch + Pull Request for review (no direct commit).</div>';
+    restartNote.innerHTML = '<div class="alert-warning">Prod target: this opens a new branch + Pull Request for review (no direct commit).</div>';
   } else {
-    resetNote.innerHTML = `<div class="alert-info">Bumps the "restart" tag and commits directly to "${target ? target.branch : label}" — forces a redeploy without changing the version.</div>`;
+    restartNote.innerHTML = `<div class="alert-info">Bumps the "restart" tag and commits directly to "${target ? target.branch : label}" — forces a redeploy without changing the version.</div>`;
   }
 }
 
-function openResetModal(service) {
+function openRestartModal(service) {
   const r = rowsByService[service];
   if (!r) return;
-  resetResult.textContent = '';
-  resetTitle.textContent = `Reset — ${service}`;
+  restartResult.textContent = '';
+  restartTitle.textContent = `Restart — ${service}`;
 
   // Only envs backed by values.yaml have a restart tag — the Jenkinsfile
   // fallback (static/testing repos) has nothing to bump.
@@ -467,7 +476,7 @@ function openResetModal(service) {
       !(r.sources && r.sources[label] === 'jenkinsfile')
   );
   if (availableLabels.length === 0) return;
-  resetEnvSelect.innerHTML = availableLabels
+  restartEnvSelect.innerHTML = availableLabels
     .map((l) => {
       const lock = r.locks && r.locks[l];
       return `<option value="${l}"${lock ? ' disabled' : ''}>${l}${lock ? ` (locked by ${lock.lockedBy})` : ''}</option>`;
@@ -475,39 +484,39 @@ function openResetModal(service) {
     .join('');
 
   const defaultEnv = localStorage.getItem('defaultDeployEnv');
-  if (defaultEnv && availableLabels.includes(defaultEnv) && !(r.locks && r.locks[defaultEnv])) resetEnvSelect.value = defaultEnv;
+  if (defaultEnv && availableLabels.includes(defaultEnv) && !(r.locks && r.locks[defaultEnv])) restartEnvSelect.value = defaultEnv;
 
-  refreshResetNote(service);
-  resetModal.showModal();
+  refreshRestartNote(service);
+  restartModal.showModal();
 }
 
-resetEnvSelect.addEventListener('change', () => {
-  const service = resetTitle.textContent.replace('Reset — ', '');
-  refreshResetNote(service);
+restartEnvSelect.addEventListener('change', () => {
+  const service = restartTitle.textContent.replace('Restart — ', '');
+  refreshRestartNote(service);
 });
 
-resetConfirmBtn.addEventListener('click', async () => {
-  const service = resetTitle.textContent.replace('Reset — ', '');
+restartConfirmBtn.addEventListener('click', async () => {
+  const service = restartTitle.textContent.replace('Restart — ', '');
   const r = rowsByService[service];
-  const label = resetEnvSelect.value;
+  const label = restartEnvSelect.value;
   const target = resolveTarget(r, label, currentEnvConfig);
   if (!target) return;
 
-  resetConfirmBtn.disabled = true;
-  resetResult.innerHTML = '<span class="spinner inline-block align-middle mr-1"></span> Resetting…';
+  restartConfirmBtn.disabled = true;
+  restartResult.innerHTML = '<span class="spinner inline-block align-middle mr-1"></span> Restarting…';
   try {
-    const res = await fetch('/api/reset', {
+    const res = await fetch('/api/restart', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...target, label, service }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Reset failed');
+    if (!res.ok) throw new Error(data.error || 'Restart failed');
 
     if (data.mode === 'pull-request') {
-      resetResult.innerHTML = `<div class="alert-success">PR opened: <a class="underline font-semibold" href="${data.prUrl}" target="_blank" rel="noopener">${data.prUrl}</a></div>`;
+      restartResult.innerHTML = `<div class="alert-success">PR opened: <a class="underline font-semibold" href="${data.prUrl}" target="_blank" rel="noopener">${data.prUrl}</a></div>`;
     } else {
-      resetResult.innerHTML = data.commitUrl
+      restartResult.innerHTML = data.commitUrl
         ? `<div class="alert-success">Committed directly to ${data.branch}: <a class="underline font-semibold" href="${data.commitUrl}" target="_blank" rel="noopener">${data.commitUrl}</a></div>`
         : `<div class="alert-success">Committed directly to ${data.branch}.</div>`;
 
@@ -515,37 +524,104 @@ resetConfirmBtn.addEventListener('click', async () => {
       schedulePendingBuildPoll();
     }
   } catch (err) {
-    resetResult.innerHTML = `<div class="alert-error">Error: ${err.message}</div>`;
+    restartResult.innerHTML = `<div class="alert-error">Error: ${err.message}</div>`;
   } finally {
-    resetConfirmBtn.disabled = false;
+    restartConfirmBtn.disabled = false;
   }
 });
 
 tbody.addEventListener('click', (e) => {
-  const btn = e.target.closest('.reset-btn');
+  const btn = e.target.closest('.restart-btn');
   if (!btn) return;
-  openResetModal(btn.dataset.service);
+  openRestartModal(btn.dataset.service);
 });
 
-// --- Lock (block Deploy/Reset/Promote for a service+env) -------------------
+// --- Lock (block Deploy/Restart/Promote for a service+env) -------------------
 
 const lockModal = document.getElementById('lock-modal');
 const lockTitle = document.getElementById('lock-title');
 const lockSub = document.getElementById('lock-sub');
 const lockCreateFields = document.getElementById('lock-create-fields');
 const lockEnvSelect = document.getElementById('lock-env');
-const lockNameInput = document.getElementById('lock-name');
 const lockReasonInput = document.getElementById('lock-reason');
 const lockInfo = document.getElementById('lock-info');
 const lockResult = document.getElementById('lock-result');
 const lockConfirmBtn = document.getElementById('lock-confirm');
 const lockUnlockConfirmBtn = document.getElementById('lock-unlock-confirm');
 const lockCancelBtn = document.getElementById('lock-cancel');
+const lockIdentityUnknown = document.getElementById('lock-identity-unknown');
+const lockIdentityKnown = document.getElementById('lock-identity-known');
+const lockIdentityInput = document.getElementById('lock-identity-input');
+const lockIdentityVerifyBtn = document.getElementById('lock-identity-verify');
+const lockIdentityNameSpan = document.getElementById('lock-identity-name');
+const lockIdentityChangeBtn = document.getElementById('lock-identity-change');
+const lockIdentityError = document.getElementById('lock-identity-error');
 
 let lockModalService = null;
 let lockModalLabel = null; // fixed when opened for an already-locked cell (unlock mode)
 
 lockCancelBtn.addEventListener('click', () => lockModal.close());
+
+function getMyGithubUser() {
+  return localStorage.getItem('lockGithubUser') || '';
+}
+
+// Reflects the resolved identity (or lack of one) in the shared identity
+// widget — used by both the create and unlock views of this modal.
+function refreshIdentityUI() {
+  const me = getMyGithubUser();
+  lockIdentityUnknown.style.display = me ? 'none' : '';
+  lockIdentityKnown.style.display = me ? '' : 'none';
+  lockIdentityNameSpan.textContent = me ? `@${me}` : '';
+}
+
+async function validateGithubUser(username) {
+  const res = await fetch(`/api/github-user?username=${encodeURIComponent(username)}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `No GitHub user "${username}"`);
+  return data.user;
+}
+
+lockIdentityVerifyBtn.addEventListener('click', async () => {
+  const username = lockIdentityInput.value.trim();
+  if (!username) return;
+  lockIdentityError.textContent = '';
+  lockIdentityVerifyBtn.disabled = true;
+  try {
+    const user = await validateGithubUser(username);
+    localStorage.setItem('lockGithubUser', user.username);
+    refreshIdentityUI();
+    refreshUnlockGate();
+  } catch (err) {
+    lockIdentityError.textContent = err.message;
+  } finally {
+    lockIdentityVerifyBtn.disabled = false;
+  }
+});
+
+lockIdentityChangeBtn.addEventListener('click', () => {
+  localStorage.removeItem('lockGithubUser');
+  lockIdentityInput.value = '';
+  lockIdentityError.textContent = '';
+  refreshIdentityUI();
+  refreshUnlockGate();
+});
+
+// In unlock mode, enables/disables the Unlock button based on whether the
+// resolved identity is the original locker.
+function refreshUnlockGate() {
+  if (lockModalLabel === null) return; // create mode — no gate to show
+  const r = rowsByService[lockModalService];
+  const lock = r && r.locks && r.locks[lockModalLabel];
+  if (!lock) return;
+  const me = getMyGithubUser().toLowerCase();
+  const allowed = me && lock.lockedBy.toLowerCase() === me;
+  lockUnlockConfirmBtn.disabled = !allowed;
+  const gateNote = document.getElementById('lock-gate-note');
+  if (gateNote) {
+    gateNote.textContent = allowed ? '' : `Only @${lock.lockedBy} can unlock this.`;
+  }
+}
 
 // Row "Lock" button — pick which (unlocked) env to lock.
 function openLockModalForCreate(service) {
@@ -554,8 +630,11 @@ function openLockModalForCreate(service) {
   lockModalService = service;
   lockModalLabel = null;
   lockResult.textContent = '';
+  lockIdentityError.textContent = '';
+  lockIdentityInput.value = '';
   lockTitle.textContent = `Lock — ${service}`;
   lockSub.textContent = '';
+  refreshIdentityUI();
 
   const availableLabels = Object.keys(currentEnvConfig).filter((label) => resolveTarget(r, label, currentEnvConfig));
   lockEnvSelect.innerHTML = availableLabels
@@ -564,12 +643,12 @@ function openLockModalForCreate(service) {
       return `<option value="${l}"${lock ? ' disabled' : ''}>${l}${lock ? ` (locked by ${lock.lockedBy})` : ''}</option>`;
     })
     .join('');
-  lockNameInput.value = localStorage.getItem('lockUserName') || '';
   lockReasonInput.value = '';
 
   lockCreateFields.classList.remove('hidden');
   lockInfo.innerHTML = '';
   lockConfirmBtn.style.display = '';
+  lockConfirmBtn.disabled = false;
   lockUnlockConfirmBtn.style.display = 'none';
   lockModal.showModal();
 }
@@ -582,25 +661,30 @@ function openLockModalForUnlock(service, label) {
   lockModalService = service;
   lockModalLabel = label;
   lockResult.textContent = '';
+  lockIdentityError.textContent = '';
+  lockIdentityInput.value = '';
   lockTitle.textContent = `Locked — ${service} / ${label}`;
   lockSub.textContent = '';
+  refreshIdentityUI();
 
   lockCreateFields.classList.add('hidden');
   lockInfo.innerHTML = `Locked by <span class="font-semibold">${escAttr(lock.lockedBy)}</span>${
     lock.reason ? ` — ${escAttr(lock.reason)}` : ''
-  }<div class="text-xs text-gray-500 mt-1">${new Date(lock.lockedAt).toLocaleString()}</div>`;
+  }<div class="text-xs text-gray-500 mt-1">${new Date(lock.lockedAt).toLocaleString()}</div>
+  <div id="lock-gate-note" class="text-xs text-amber-700 mt-1"></div>`;
   lockConfirmBtn.style.display = 'none';
   lockUnlockConfirmBtn.style.display = '';
+  refreshUnlockGate();
   lockModal.showModal();
 }
 
 lockConfirmBtn.addEventListener('click', async () => {
   const service = lockModalService;
   const label = lockEnvSelect.value;
-  const lockedBy = lockNameInput.value.trim();
+  const lockedBy = getMyGithubUser();
   const reason = lockReasonInput.value.trim();
   if (!lockedBy) {
-    lockResult.innerHTML = '<div class="alert-error">Enter your name.</div>';
+    lockResult.innerHTML = '<div class="alert-error">Verify your GitHub username first.</div>';
     return;
   }
 
@@ -615,7 +699,6 @@ lockConfirmBtn.addEventListener('click', async () => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Lock failed');
 
-    localStorage.setItem('lockUserName', lockedBy);
     const r = rowsByService[service];
     if (r) {
       r.locks = r.locks || {};
@@ -633,10 +716,16 @@ lockConfirmBtn.addEventListener('click', async () => {
 lockUnlockConfirmBtn.addEventListener('click', async () => {
   const service = lockModalService;
   const label = lockModalLabel;
+  const requestedBy = getMyGithubUser();
+  if (!requestedBy) {
+    lockResult.innerHTML = '<div class="alert-error">Verify your GitHub username first.</div>';
+    return;
+  }
+
   lockUnlockConfirmBtn.disabled = true;
   lockResult.innerHTML = '<span class="spinner inline-block align-middle mr-1"></span> Unlocking…';
   try {
-    const qs = new URLSearchParams({ service, label });
+    const qs = new URLSearchParams({ service, label, requestedBy });
     const res = await fetch(`/api/locks?${qs.toString()}`, { method: 'DELETE' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Unlock failed');
@@ -687,7 +776,7 @@ let selectedServices = new Set(servicesFromUrl() || JSON.parse(localStorage.getI
 function renderTable(data) {
   const th = (text) => `<th class="sticky top-0 bg-gray-50 uppercase text-xs tracking-wide text-gray-500 font-semibold text-left px-4 py-3">${text}</th>`;
   headerRow.innerHTML =
-    th('Service') + data.envLabels.map(th).join('') + th('Deploy') + th('Reset') + th('Lock');
+    th('Service') + data.envLabels.map(th).join('') + th('Deploy') + th('Restart') + th('Lock');
 
   const filtered = selectedServices.size === 0
     ? data.results
@@ -734,16 +823,16 @@ function renderTable(data) {
       })
       .join('');
     const deployCell = `<td class="px-4 py-3 whitespace-nowrap"><button class="btn btn-primary rounded-full text-xs py-1 px-3 deploy-btn" data-service="${r.service}">Deploy</button></td>`;
-    const hasResetTarget = data.envLabels.some(
+    const hasRestartTarget = data.envLabels.some(
       (label) => resolveTarget(r, label, data.envConfig) && r.versions[label] && !(r.sources && r.sources[label] === 'jenkinsfile')
     );
-    const resetCell = `<td class="px-4 py-3 whitespace-nowrap"><button class="btn btn-warning rounded-full text-xs py-1 px-3 reset-btn" data-service="${r.service}"${hasResetTarget ? '' : ' disabled'}>Reset</button></td>`;
+    const restartCell = `<td class="px-4 py-3 whitespace-nowrap"><button class="btn btn-warning rounded-full text-xs py-1 px-3 restart-btn" data-service="${r.service}"${hasRestartTarget ? '' : ' disabled'}>Restart</button></td>`;
     const hasLockTarget = data.envLabels.some((label) => resolveTarget(r, label, data.envConfig));
     const lockCell = `<td class="px-4 py-3 whitespace-nowrap"><button class="btn btn-lock rounded-full text-xs py-1 px-3 lock-btn" data-service="${r.service}"${hasLockTarget ? '' : ' disabled'}>Lock</button></td>`;
     const serviceCell = `<td class="px-4 py-3 whitespace-nowrap font-semibold">
       <button class="refresh-btn" data-service="${r.service}" title="Refresh this service's versions/status">&#10227;</button>${r.service}
     </td>`;
-    tr.innerHTML = `${serviceCell}${cells}${deployCell}${resetCell}${lockCell}`;
+    tr.innerHTML = `${serviceCell}${cells}${deployCell}${restartCell}${lockCell}`;
     tbody.appendChild(tr);
   });
   table.classList.remove('hidden');

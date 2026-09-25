@@ -17,7 +17,7 @@ const router = express.Router();
 // Forces a redeploy of whatever version is already running, by bumping the
 // `restart:` counter in values.yaml — no version change, just a fresh rollout
 // (useful when a pod/deploy is stuck). Same direct-commit vs PR split as /api/deploy.
-router.post('/api/reset', async (req, res) => {
+router.post('/api/restart', async (req, res) => {
   if (!TOKEN) {
     return res.status(500).json({ error: 'GITHUB_TOKEN not set on server' });
   }
@@ -26,11 +26,11 @@ router.post('/api/reset', async (req, res) => {
     return res.status(400).json({ error: 'repo, branch, path, and label are required' });
   }
   if (filePath.endsWith('Jenkinsfile')) {
-    return res.status(422).json({ error: 'Reset only applies to values.yaml deployments (no restart tag in Jenkinsfile)' });
+    return res.status(422).json({ error: 'Restart only applies to values.yaml deployments (no restart tag in Jenkinsfile)' });
   }
 
   // Fail-open: a lock-check DB error shouldn't block an otherwise-working
-  // reset path — log it and proceed as if unlocked.
+  // restart path — log it and proceed as if unlocked.
   let lock = null;
   try {
     lock = await getLock(service, label);
@@ -47,7 +47,7 @@ router.post('/api/reset', async (req, res) => {
   try {
     const { content, sha } = await fetchFileWithSha(repo, branch, filePath);
     const newContent = bumpRestartCount(content);
-    const message = `Reset ${service || ''} ${label} (restart tag bump)`.trim();
+    const message = `Restart ${service || ''} ${label} (restart tag bump)`.trim();
 
     if (!PROD_LABELS.has(label)) {
       const commitResult = await commitFileUpdate(repo, branch, filePath, newContent, sha, message);
@@ -58,7 +58,7 @@ router.post('/api/reset', async (req, res) => {
 
     const baseSha = await getBranchHeadSha(repo, branch);
     const suffix = Math.random().toString(36).slice(2, 7);
-    const newBranch = `reset-${label}-${suffix}`;
+    const newBranch = `restart-${label}-${suffix}`;
     await createBranch(repo, newBranch, baseSha);
     await commitFileUpdate(repo, newBranch, filePath, newContent, sha, message);
     const pr = await createPullRequest(

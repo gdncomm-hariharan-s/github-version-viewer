@@ -1,0 +1,61 @@
+public/detail.html
+  82e436acf6a16461 15-19,44,74-86,111
+routes/build-status.js
+  82e436acf6a16461 1-26
+lib/config.js
+  82e436acf6a16461 1-77
+routes/jira.js
+  82e436acf6a16461 1-52
+routes/versions.js
+  82e436acf6a16461 1-20
+public/release.html
+  82e436acf6a16461 21-24,41-61,125-126,132,139-142,171-235
+README.md
+  82e436acf6a16461 40-47,55-81
+public/index.html
+  82e436acf6a16461 12,14-15,31-32,35-36,49,79,114-133,164,166-181,219-226,228-249,286,306-321,352-359,374-477,498,505,509-523,538-539,543-550,554-556,558-600,603-684,703-713
+routes/deploy.js
+  82e436acf6a16461 1-105
+lib/compare.js
+  82e436acf6a16461 1-234
+routes/release-prs.js
+  82e436acf6a16461 1-20
+routes/index.js
+  82e436acf6a16461 1-12
+routes/reset.js
+  82e436acf6a16461 1-61
+routes/refresh.js
+  82e436acf6a16461 1-34
+lib/github.js
+  82e436acf6a16461 1-334
+.env.example
+  82e436acf6a16461 4-8
+lib/jira.js
+  82e436acf6a16461 1-84
+lib/cache.js
+  82e436acf6a16461 1-18
+server.js
+  82e436acf6a16461 4-5,11
+lib/versions.js
+  82e436acf6a16461 1-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.23",
+  "base_commit_sha": "7cb39231153eb1a448b7ee7989524f2c74d22592",
+  "prompts": {
+    "82e436acf6a16461": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9b999ace-fe3d-4ee4-a883-b9039864d7ed",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "hariharan s <hariharan.s@gdn-commerce.com>",
+      "messages": [],
+      "total_additions": 2352,
+      "total_deletions": 1218,
+      "accepted_lines": 1707,
+      "overriden_lines": 0
+    }
+  }
+}

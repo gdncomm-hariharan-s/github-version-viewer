@@ -1,0 +1,43 @@
+README.md
+  82e436acf6a16461 13,19,38,50-51,92
+public/index.html
+  82e436acf6a16461 37-38,136-167,198-202,217-220,222-223,303-308,311,470-475,478,530-669,690,711,732-733,741-742,746,792,886-889,894-901,1031
+lib/locks.js
+  82e436acf6a16461 1-37
+routes/locks.js
+  82e436acf6a16461 1-42
+routes/deploy.js
+  82e436acf6a16461 14,54-68
+routes/reset.js
+  82e436acf6a16461 13,32-46
+lib/config.js
+  82e436acf6a16461 5-6,60
+lib/db.js
+  82e436acf6a16461 1-32
+routes/index.js
+  82e436acf6a16461 11
+server.js
+  82e436acf6a16461 5,14-19
+.env.example
+  82e436acf6a16461 9-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.23",
+  "base_commit_sha": "df3ad37ba170e91f383d3475c565314e7190d8b9",
+  "prompts": {
+    "82e436acf6a16461": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9b999ace-fe3d-4ee4-a883-b9039864d7ed",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "hariharan s <hariharan.s@gdn-commerce.com>",
+      "messages": [],
+      "total_additions": 423,
+      "total_deletions": 18,
+      "accepted_lines": 418,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -11,6 +11,7 @@ const {
 } = require('../lib/github');
 const { applyVersionChange } = require('../lib/versions');
 const { clearRouteCache } = require('../lib/cache');
+const { getLock } = require('../lib/locks');
 
 const router = express.Router();
 
@@ -48,6 +49,21 @@ router.post('/api/deploy', async (req, res) => {
   }
   if (!/^[\w.\-]+$/.test(version)) {
     return res.status(400).json({ error: 'version contains invalid characters' });
+  }
+
+  // Fail-open: a lock-check DB error shouldn't block an otherwise-working
+  // deploy path — log it and proceed as if unlocked.
+  let lock = null;
+  try {
+    lock = await getLock(service, label);
+  } catch (err) {
+    console.warn(`[locks] could not verify lock status for ${service}/${label}, proceeding as unlocked: ${err.message}`);
+  }
+  if (lock) {
+    return res.status(423).json({
+      error: `${service} / ${label} is locked by ${lock.locked_by}${lock.reason ? ` (${lock.reason})` : ''}`,
+      lock,
+    });
   }
 
   try {

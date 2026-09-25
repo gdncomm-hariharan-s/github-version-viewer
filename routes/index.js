@@ -8,5 +8,6 @@ router.use(require('./refresh'));
 router.use(require('./versions'));
 router.use(require('./release-prs'));
 router.use(require('./jira'));
+router.use(require('./locks'));
 
 module.exports = router;

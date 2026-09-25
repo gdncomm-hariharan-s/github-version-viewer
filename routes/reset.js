@@ -10,6 +10,7 @@ const {
 } = require('../lib/github');
 const { bumpRestartCount } = require('../lib/versions');
 const { clearRouteCache } = require('../lib/cache');
+const { getLock } = require('../lib/locks');
 
 const router = express.Router();
 
@@ -26,6 +27,21 @@ router.post('/api/reset', async (req, res) => {
   }
   if (filePath.endsWith('Jenkinsfile')) {
     return res.status(422).json({ error: 'Reset only applies to values.yaml deployments (no restart tag in Jenkinsfile)' });
+  }
+
+  // Fail-open: a lock-check DB error shouldn't block an otherwise-working
+  // reset path — log it and proceed as if unlocked.
+  let lock = null;
+  try {
+    lock = await getLock(service, label);
+  } catch (err) {
+    console.warn(`[locks] could not verify lock status for ${service}/${label}, proceeding as unlocked: ${err.message}`);
+  }
+  if (lock) {
+    return res.status(423).json({
+      error: `${service} / ${label} is locked by ${lock.locked_by}${lock.reason ? ` (${lock.reason})` : ''}`,
+      lock,
+    });
   }
 
   try {

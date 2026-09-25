@@ -10,11 +10,13 @@ Internal tool for comparing deployed versions of GDN digital-products services a
 - **Release PR summary** (`release.html`) — lists today's open, non-automated release PRs per service (static / canary / non-canary), tagged with the matching Jira CRF ticket, with copy-to-clipboard for individual PR links and a combined formatted list.
 - **Deploy from the UI** — per-row **Deploy** button opens a modal (environment dropdown limited to envs the service actually has, version textbox with autocomplete from past versions). Commits directly for `qa2`/`preprod` environments; opens a branch + PR for `prod` environments. A "Default deploy env" dropdown lets you skip picking the environment every time.
 - **Bulk promote preprod → prod** — lists every service where `preprod` differs from `prod`, lets you drop rows you don't want, asks for confirmation, then bulk-creates PRs and reports the results.
+- **Lock a service/env** — per-row **Lock** button locks a specific (service, env) pair (name + optional reason), blocking Deploy/Reset/Promote for it; a padlock on the version pill shows who locked it (hover for the reason). Unlocking is unrestricted — a visible social signal, not access control. Backed by Postgres (`DATABASE_URL`); if the DB is unreachable, lock badges just don't show and Deploy/Reset/Promote proceed as if unlocked (fail-open) rather than the app breaking.
 
 ## Requirements
 
 - Node.js 18+
 - A GitHub token with `read:org` and `repo` scopes (e.g. from `gh auth token` after `gh auth login`)
+- A reachable PostgreSQL instance, only if using the lock feature (`DATABASE_URL`)
 
 ## Setup
 
@@ -33,6 +35,7 @@ Open `http://localhost:3000`.
 | `GITHUB_TOKEN` | GitHub token used for all API calls           |
 | `GITHUB_ORG`   | GitHub org to read teams/repos from (`gdncomm`) |
 | `PORT`         | Port to serve the app on (default `3000`)     |
+| `DATABASE_URL` | Optional — Postgres connection string, enables the lock feature |
 
 ## Project layout
 
@@ -44,6 +47,8 @@ lib/versions.js       image.tag / Jenkinsfile version + restart-tag regex extrac
 lib/cache.js          Route-level response cache (routeCache/cachedRoute)
 lib/compare.js         Business logic: buildVersionsCompare, buildReleasePrs
 lib/jira.js           Jira ADF document helpers (CRF update)
+lib/db.js             Postgres pool + idempotent schema init
+lib/locks.js          Lock table queries (list/get/create/delete)
 routes/*.js         One Express router per feature area, mounted via routes/index.js
 public/index.html   Main comparison dashboard
 public/detail.html  Per-file commit history view
@@ -84,3 +89,4 @@ Measured cold-cache cost per endpoint (direct in-process instrumentation, not th
 
 - Access is intended to be restricted to the internal VPN/network; there is no authentication built into the app itself.
 - Version edits use regex-based patching of YAML/Groovy text rather than a full YAML parser, so they only support the `image:\n  tag:` pattern and known `Jenkinsfile version` lines.
+- Locking is a visible/social signal, not access control — anyone can lock or unlock anything, matching the app's lack of auth. The Postgres dependency is fail-open by design: if it's unreachable, Deploy/Reset/Promote proceed as if unlocked (a DB outage never blocks an otherwise-working deploy path) and lock badges simply stop showing until it's back.

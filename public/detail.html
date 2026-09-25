@@ -12,6 +12,11 @@
   .version-pill { @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200; font-variant-numeric: tabular-nums; }
   tr.current td { @apply bg-emerald-50; }
   tr.current .version-pill { @apply bg-emerald-100 text-emerald-800 border-emerald-300; }
+  .build-pill { @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border; }
+  .build-success { @apply bg-emerald-100 text-emerald-800 border-emerald-300; }
+  .build-failure, .build-error { @apply bg-red-100 text-red-700 border-red-300; }
+  .build-pending { @apply bg-amber-100 text-amber-800 border-amber-300; }
+  .build-unknown { @apply bg-gray-100 text-gray-500 border-gray-200; }
   .spinner { width: 14px; height: 14px; border: 2px solid #e5e7eb; border-top-color: #4f46e5; border-radius: 9999px; animation: spin 0.7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
@@ -36,6 +41,7 @@
               <th class="uppercase text-xs tracking-wide text-gray-500 font-semibold text-left px-4 py-3">Changed</th>
               <th class="uppercase text-xs tracking-wide text-gray-500 font-semibold text-left px-4 py-3">Author</th>
               <th class="uppercase text-xs tracking-wide text-gray-500 font-semibold text-left px-4 py-3">Commit</th>
+              <th class="uppercase text-xs tracking-wide text-gray-500 font-semibold text-left px-4 py-3">Jenkins</th>
             </tr>
           </thead>
           <tbody id="result-body" class="divide-y divide-gray-100"></tbody>
@@ -65,6 +71,19 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleString();
 }
 
+const BUILD_TEXT = { success: 'Passed', failure: 'Failed', error: 'Error', pending: 'Building…', unknown: 'No status' };
+
+function buildPill(build) {
+  const state = build?.state || 'unknown';
+  const text = BUILD_TEXT[state] || state;
+  const cls = `build-pill build-${state}`;
+  const spinner = state === 'pending' ? '<span class="spinner"></span>' : '';
+  if (build?.targetUrl) {
+    return `<a class="${cls} hover:opacity-80" href="${build.targetUrl}" target="_blank" rel="noopener">${spinner}${text}</a>`;
+  }
+  return `<span class="${cls}">${spinner}${text}</span>`;
+}
+
 async function load() {
   if (!repo || !branch || !path) {
     statusEl.innerHTML = '<div class="alert-error">Missing repo/branch/path in URL.</div>';
@@ -89,6 +108,7 @@ async function load() {
         <td class="px-4 py-3 whitespace-nowrap">${fmtDate(h.date)}</td>
         <td class="px-4 py-3 whitespace-nowrap">${h.author}</td>
         <td class="px-4 py-3"><a class="text-indigo-600 hover:underline font-semibold" href="${h.htmlUrl}" target="_blank" rel="noopener">${h.shortSha}</a> <span class="text-gray-500 text-xs">${h.message}</span></td>
+        <td class="px-4 py-3 whitespace-nowrap">${buildPill(h.build)}</td>
       `;
       tbody.appendChild(tr);
     });

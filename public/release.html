@@ -18,6 +18,10 @@
   .btn-plain { @apply border border-gray-300 text-gray-600 hover:bg-gray-50; }
   .spinner { width: 14px; height: 14px; border: 2px solid #e5e7eb; border-top-color: #4f46e5; border-radius: 9999px; animation: spin 0.7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .alert-success { @apply rounded-lg px-3 py-2 text-sm bg-emerald-50 text-emerald-700; }
+  .field-label { @apply block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1; }
+  .input-field { @apply w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500; }
+  dialog::backdrop { background: rgba(15,17,21,0.45); }
 </style>
 </head>
 <body class="min-h-screen">
@@ -33,6 +37,27 @@
     <button id="copy-all" class="btn btn-primary rounded-full hidden">Copy formatted list</button>
     <div id="cards"></div>
   </div>
+
+  <dialog id="jira-modal" class="rounded-xl shadow-xl p-0 max-w-md w-full">
+    <div class="p-6">
+      <h3 class="font-bold text-lg" id="jira-title">Update Jira CRF</h3>
+      <p class="text-xs text-gray-500 mb-4" id="jira-sub"></p>
+
+      <div id="jira-entries" class="text-xs text-gray-600 space-y-1 mb-4"></div>
+
+      <label class="block">
+        <span class="field-label">Task Dependencies (if any, or ignore it)</span>
+        <input id="jira-dependency" type="text" placeholder="e.g. Depends on XDP-12345" class="input-field" />
+      </label>
+
+      <div id="jira-result" class="mt-3 text-sm"></div>
+
+      <div class="flex justify-end gap-2 mt-6">
+        <button class="btn btn-plain rounded-md" id="jira-cancel">Cancel</button>
+        <button class="btn btn-primary rounded-md" id="jira-confirm">Update CRF</button>
+      </div>
+    </div>
+  </dialog>
 
 <script>
 const statusEl = document.getElementById('status');
@@ -97,18 +122,24 @@ copyAllBtn.addEventListener('click', () => {
   copyText(formattedList, copyAllBtn, 'Copy formatted list');
 });
 
+let lastResults = [];
+
 async function load() {
   try {
     const res = await fetch('/api/release-prs');
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Request failed');
+    lastResults = data.results;
 
     cards.innerHTML = '';
     data.results.forEach((r) => {
       const card = document.createElement('div');
       card.className = 'card p-5 mb-4';
       const crfHtml = r.crf
-        ? `<div class="mb-2"><a class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-300" href="https://gdncomm.atlassian.net/browse/${r.crf}" target="_blank" rel="noopener">${r.crf}</a></div>`
+        ? `<div class="mb-2 flex items-center gap-2">
+             <a class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-300" href="https://gdncomm.atlassian.net/browse/${r.crf}" target="_blank" rel="noopener">${r.crf}</a>
+             <button class="text-xs font-semibold text-indigo-600 border border-indigo-300 rounded-md px-2 py-1 hover:bg-indigo-50 jira-update-btn" data-service="${r.service}">Update Jira CRF</button>
+           </div>`
         : '';
       const prsSorted = [...r.prs].sort((a, b) => (LABEL_ORDER[a.label] ?? 9) - (LABEL_ORDER[b.label] ?? 9));
       const prRows = prsSorted
@@ -137,6 +168,71 @@ async function load() {
 }
 
 load();
+
+// --- Update Jira CRF -------------------------------------------------------
+
+const jiraModal = document.getElementById('jira-modal');
+const jiraTitle = document.getElementById('jira-title');
+const jiraSub = document.getElementById('jira-sub');
+const jiraEntries = document.getElementById('jira-entries');
+const jiraDependency = document.getElementById('jira-dependency');
+const jiraResult = document.getElementById('jira-result');
+const jiraConfirmBtn = document.getElementById('jira-confirm');
+const jiraCancelBtn = document.getElementById('jira-cancel');
+
+let jiraTargetService = null;
+
+function openJiraModal(service) {
+  const r = lastResults.find((x) => x.service === service);
+  if (!r || !r.crf) return;
+  jiraTargetService = service;
+  jiraResult.textContent = '';
+  jiraDependency.value = '';
+  jiraTitle.textContent = `Update ${r.crf}`;
+  jiraSub.textContent = `Adds these PR links to the "IMPLEMENTATION STEPS" table and Implementation Plan field.`;
+
+  const entries = r.prs.filter((pr) => !pr.automated);
+  jiraEntries.innerHTML = entries
+    .map((pr) => `<div>${LABEL_TEXT[pr.label] || pr.label}: <span class="font-mono">${pr.url}</span></div>`)
+    .join('');
+
+  jiraModal.showModal();
+}
+
+cards.addEventListener('click', (e) => {
+  const btn = e.target.closest('.jira-update-btn');
+  if (!btn) return;
+  openJiraModal(btn.dataset.service);
+});
+
+jiraCancelBtn.addEventListener('click', () => jiraModal.close());
+
+jiraConfirmBtn.addEventListener('click', async () => {
+  const r = lastResults.find((x) => x.service === jiraTargetService);
+  if (!r || !r.crf) return;
+  const entries = r.prs.filter((pr) => !pr.automated).map((pr) => ({ label: LABEL_TEXT[pr.label] || pr.label, url: pr.url }));
+  if (entries.length === 0) {
+    jiraResult.innerHTML = '<div class="alert-error">No non-automated PRs to add.</div>';
+    return;
+  }
+
+  jiraConfirmBtn.disabled = true;
+  jiraResult.innerHTML = '<span class="spinner inline-block align-middle mr-1"></span> Updating Jira…';
+  try {
+    const res = await fetch('/api/jira/update-crf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ crf: r.crf, entries, taskDependency: jiraDependency.value.trim() }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Update failed');
+    jiraResult.innerHTML = `<div class="alert-success">Updated: <a class="underline font-semibold" href="${data.url}" target="_blank" rel="noopener">${data.url}</a></div>`;
+  } catch (err) {
+    jiraResult.innerHTML = `<div class="alert-error">Error: ${err.message}</div>`;
+  } finally {
+    jiraConfirmBtn.disabled = false;
+  }
+});
 </script>
 </body>
 </html>
